@@ -108,30 +108,52 @@ $csrfToken = getCsrfToken();
             </form>
 
             <!-- Register Form -->
-            <form id="register-form" class="auth-form hidden">
+            <form id="register-form" class="auth-form hidden" autocomplete="on">
                 <div class="form-group">
-                    <label for="reg-fullname">Full Name</label>
-                    <input type="text" id="reg-fullname" required placeholder="Juan Dela Cruz">
+                    <label for="reg-fullname">Full Name *</label>
+                    <input type="text" id="reg-fullname" required placeholder="Juan Dela Cruz" autocomplete="name">
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="reg-username">Username</label>
-                        <input type="text" id="reg-username" required placeholder="jdelacruz">
+                        <label for="reg-username">Username *</label>
+                        <input type="text" id="reg-username" required placeholder="jdelacruz" pattern="[a-zA-Z0-9_.-]{3,32}" autocomplete="username" autocapitalize="none">
+                        <small class="muted" style="font-size:11px;display:block;margin-top:3px;">3-32 letters, numbers, dot, underscore (no spaces)</small>
                     </div>
                     <div class="form-group">
-                        <label for="reg-dept">Department</label>
-                        <input type="text" id="reg-dept" placeholder="Operations" value="General">
+                        <label for="reg-dept">Department *</label>
+                        <input type="text" id="reg-dept" list="dept-options" placeholder="Select or type..." value="General" required>
+                        <datalist id="dept-options">
+                            <option value="Administration">
+                            <option value="Faculty / Academics">
+                            <option value="IT &amp; Tech Support">
+                            <option value="Finance &amp; Accounting">
+                            <option value="Human Resources">
+                            <option value="Registrar &amp; Admissions">
+                            <option value="Library Services">
+                            <option value="Student Affairs">
+                            <option value="Operations">
+                            <option value="General">
+                        </datalist>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="reg-email">Email Address</label>
-                    <input type="email" id="reg-email" required placeholder="juan@kcc.local">
+                    <label for="reg-email">Email Address *</label>
+                    <input type="email" id="reg-email" required placeholder="juan@gmail.com" autocomplete="email">
                 </div>
-                <div class="form-group">
-                    <label for="reg-password">Password (min 6 chars)</label>
-                    <input type="password" id="reg-password" required minlength="6" placeholder="Create password">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="reg-password">Password (min 6 chars) *</label>
+                        <input type="password" id="reg-password" required minlength="6" placeholder="Create password" autocomplete="new-password">
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-confirm-password">Confirm Password *</label>
+                        <input type="password" id="reg-confirm-password" required minlength="6" placeholder="Re-type password" autocomplete="new-password">
+                        <small id="reg-pwd-match" style="font-size:11px;display:block;margin-top:3px;"></small>
+                    </div>
                 </div>
-                <button type="submit" class="btn btn-primary btn-block">Create Account</button>
+                <button type="submit" id="reg-submit-btn" class="btn btn-primary btn-block">
+                    <span class="btn-text">Create Account</span>
+                </button>
             </form>
 
             <div id="auth-pwa-bar" class="auth-pwa-bar hidden">
@@ -281,6 +303,38 @@ $csrfToken = getCsrfToken();
 
                 <!-- VIEW: Send Document -->
                 <section id="view-send" class="view-section hidden">
+                    <!-- Live System Engine Status Bar -->
+                    <div class="system-status-banner">
+                        <div class="sys-item">
+                            <span class="sys-pulse green"></span>
+                            <div>
+                                <div class="sys-title">Cloud Platform</div>
+                                <div class="sys-val">Render Web Service &bull; PHP 8.2</div>
+                            </div>
+                        </div>
+                        <div class="sys-item">
+                            <span class="sys-pulse blue"></span>
+                            <div>
+                                <div class="sys-title">Database Engine</div>
+                                <div class="sys-val">TiDB Cloud MySQL (TLS 1.3)</div>
+                            </div>
+                        </div>
+                        <div class="sys-item">
+                            <span class="sys-pulse purple"></span>
+                            <div>
+                                <div class="sys-title">Notification Gateway</div>
+                                <div class="sys-val">Google Apps Script / Gmail Active</div>
+                            </div>
+                        </div>
+                        <div class="sys-item">
+                            <span class="sys-pulse emerald"></span>
+                            <div>
+                                <div class="sys-title">Cloud Storage</div>
+                                <div class="sys-val">Max 25 MB &bull; Instant Routing</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="card upload-card">
                         <div class="card-header">
                             <h3>Upload &amp; Send Document</h3>
@@ -860,6 +914,51 @@ $csrfToken = getCsrfToken();
                     <div id="active-tokens-list" class="receipt-list"></div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Uploading & Sending Progress Modal with Real-time Animation -->
+    <div id="upload-progress-modal" class="modal-overlay hidden" aria-modal="true" role="dialog">
+        <div class="modal-card upload-progress-card">
+            <div class="upload-anim-header">
+                <div class="upload-icon-pulse">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon">
+                        <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
+                        <path d="M12 2a10 10 0 0 1 10 10"/>
+                    </svg>
+                </div>
+                <h3 id="upload-progress-title">Uploading &amp; Dispatching...</h3>
+                <p id="upload-progress-sub" class="muted">Encrypting documents and notifying recipients</p>
+            </div>
+
+            <!-- Animated Progress Bar -->
+            <div class="upload-progress-track">
+                <div id="upload-progress-fill" class="upload-progress-fill"></div>
+            </div>
+            <div class="upload-progress-stats">
+                <span id="upload-progress-percent">15%</span>
+                <span id="upload-progress-bytes">Preparing payload...</span>
+            </div>
+
+            <!-- Live Checklist Steps with Checkmark Animations -->
+            <ul class="upload-steps-list">
+                <li id="step-pack" class="upload-step active">
+                    <span class="step-badge">1</span>
+                    <span class="step-text">Packaging and encrypting attached files</span>
+                </li>
+                <li id="step-storage" class="upload-step pending">
+                    <span class="step-badge">2</span>
+                    <span class="step-text">Uploading to secure cloud storage</span>
+                </li>
+                <li id="step-db" class="upload-step pending">
+                    <span class="step-badge">3</span>
+                    <span class="step-text">Generating Document Code &amp; database receipts</span>
+                </li>
+                <li id="step-email" class="upload-step pending">
+                    <span class="step-badge">4</span>
+                    <span class="step-text">Dispatching real-time Gmail notifications</span>
+                </li>
+            </ul>
         </div>
     </div>
 

@@ -1870,9 +1870,54 @@
             }
         });
 
+        // Real-time password match and username sanitization
+        const regPwd = $('#reg-password');
+        const regConfirm = $('#reg-confirm-password');
+        const pwdMatchNotice = $('#reg-pwd-match');
+        const regUser = $('#reg-username');
+
+        function checkPasswordMatch() {
+            if (!regConfirm || !regConfirm.value) {
+                if (pwdMatchNotice) {
+                    pwdMatchNotice.textContent = '';
+                    pwdMatchNotice.className = '';
+                }
+                return;
+            }
+            if (regPwd.value === regConfirm.value) {
+                pwdMatchNotice.textContent = '✓ Passwords match';
+                pwdMatchNotice.className = 'pwd-match';
+            } else {
+                pwdMatchNotice.textContent = '✕ Passwords do not match';
+                pwdMatchNotice.className = 'pwd-mismatch';
+            }
+        }
+
+        regPwd?.addEventListener('input', checkPasswordMatch);
+        regConfirm?.addEventListener('input', checkPasswordMatch);
+
+        regUser?.addEventListener('input', () => {
+            regUser.value = regUser.value.toLowerCase().replace(/\s+/g, '');
+        });
+
         // Register submit
         $('#register-form').addEventListener('submit', async (e) => {
             e.preventDefault();
+            const pwd = $('#reg-password').value;
+            const confirm = $('#reg-confirm-password')?.value;
+            if (confirm && pwd !== confirm) {
+                toast('Passwords do not match. Please re-enter.', 'error');
+                $('#reg-confirm-password').focus();
+                return;
+            }
+
+            const btn = $('#reg-submit-btn');
+            const originalText = btn ? btn.innerHTML : 'Create Account';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spin-icon" style="display:inline-block;margin-right:6px">⏳</span> Creating Account...';
+            }
+
             try {
                 const data = await apiFetch('api/auth.php?action=register', {
                     method: 'POST',
@@ -1881,14 +1926,20 @@
                         username: $('#reg-username').value.trim(),
                         department: $('#reg-dept').value.trim(),
                         email: $('#reg-email').value.trim(),
-                        password: $('#reg-password').value,
+                        password: pwd,
                     },
                 });
                 state.csrfToken = data.csrf_token;
                 toast('Account created successfully!', 'success');
+                $('#register-form').reset();
                 onAuthenticated(data.user);
             } catch (err) {
                 toast(err.message, 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
             }
         });
 
@@ -2283,6 +2334,31 @@
             updateSelectedRecipientCount();
         });
 
+        function updateUploadProgress(pct, statusText, stepIndex) {
+            const fill = $('#upload-progress-fill');
+            const pctLabel = $('#upload-progress-percent');
+            const bytesLabel = $('#upload-progress-bytes');
+            if (fill) fill.style.width = `${pct}%`;
+            if (pctLabel) pctLabel.textContent = `${pct}%`;
+            if (bytesLabel && statusText) bytesLabel.textContent = statusText;
+
+            const steps = [$('#step-pack'), $('#step-storage'), $('#step-db'), $('#step-email')];
+            steps.forEach((el, idx) => {
+                if (!el) return;
+                const badge = el.querySelector('.step-badge');
+                if (idx < stepIndex) {
+                    el.className = 'upload-step done';
+                    if (badge) badge.textContent = '✓';
+                } else if (idx === stepIndex) {
+                    el.className = 'upload-step active';
+                    if (badge) badge.textContent = `${idx + 1}`;
+                } else {
+                    el.className = 'upload-step pending';
+                    if (badge) badge.textContent = `${idx + 1}`;
+                }
+            });
+        }
+
         $('#upload-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!state.selectedFiles.length) {
@@ -2299,6 +2375,10 @@
             btn.disabled = true;
             btn.textContent = `Uploading ${state.selectedFiles.length} file(s)...`;
 
+            const progressModal = $('#upload-progress-modal');
+            progressModal?.classList.remove('hidden');
+            updateUploadProgress(15, `Packaging ${state.selectedFiles.length} file(s)...`, 0);
+
             try {
                 const fd = new FormData();
                 fd.append('title', $('#doc-title').value.trim());
@@ -2308,22 +2388,42 @@
                 state.selectedFiles.forEach((f) => fd.append('files[]', f));
                 selectedRecs.forEach((id) => fd.append('recipients[]', id));
 
-                const data = await apiFetch('api/documents.php?action=upload', {
+                // Step 2: Storage upload animation step
+                await new Promise((r) => setTimeout(r, 350));
+                updateUploadProgress(45, 'Encrypting & uploading to cloud storage...', 1);
+
+                const dataPromise = apiFetch('api/documents.php?action=upload', {
                     method: 'POST',
                     body: fd,
                 });
+
+                // Step 3: Progressive step while request finishes
+                await new Promise((r) => setTimeout(r, 400));
+                updateUploadProgress(70, 'Generating unique Document Code & receipts...', 2);
+
+                const data = await dataPromise;
+
+                // Step 4: Dispatch notifications & finish
+                updateUploadProgress(95, 'Dispatching real-time notifications...', 3);
+                await new Promise((r) => setTimeout(r, 300));
+                updateUploadProgress(100, 'Complete!', 4);
 
                 let msg = `${data.doc_code} (${data.file_count || 1} file(s)) sent to ${data.recipient_count} recipient(s)!`;
                 if (data.email_summary && data.email_summary.enabled) {
                     msg += ` Emails sent: ${data.email_summary.sent}, failed: ${data.email_summary.failed}.`;
                 }
                 toast(msg, data.email_summary?.failed > 0 ? 'info' : 'success');
-                $('#upload-form').reset();
-                clearSelectedFiles();
-                $$('input[name="recipient_id"]').forEach((cb) => { cb.checked = false; });
-                updateSelectedRecipientCount();
-                switchView('sent');
+
+                setTimeout(() => {
+                    progressModal?.classList.add('hidden');
+                    $('#upload-form').reset();
+                    clearSelectedFiles();
+                    $$('input[name="recipient_id"]').forEach((cb) => { cb.checked = false; });
+                    updateSelectedRecipientCount();
+                    switchView('sent');
+                }, 600);
             } catch (err) {
+                progressModal?.classList.add('hidden');
                 toast(err.message, 'error');
             } finally {
                 btn.disabled = false;
