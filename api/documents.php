@@ -479,7 +479,8 @@ if ($action === 'upload') {
 
         $emailSummary = ['enabled' => false, 'sent' => 0, 'failed' => 0];
         $emailConfig = getEmailSettings(true);
-        if ((int) ($emailConfig['enabled'] ?? 0) === 1) {
+        $hasSmtpCreds = !empty($emailConfig['smtp_username']) && !empty($emailConfig['smtp_password']);
+        if ((int) ($emailConfig['enabled'] ?? 0) === 1 && $hasSmtpCreds) {
             $emailSummary['enabled'] = true;
             $docPayload = [
                 'id' => $docId,

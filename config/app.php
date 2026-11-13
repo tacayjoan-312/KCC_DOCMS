@@ -402,7 +402,8 @@ function startAppSession(): void
     }
 
     $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || ((int) ($_SERVER['SERVER_PORT'] ?? 0) === 443);
+        || ((int) ($_SERVER['SERVER_PORT'] ?? 0) === 443)
+        || (strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https');
 
     session_set_cookie_params([
         'lifetime' => 0,
