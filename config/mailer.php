@@ -181,6 +181,57 @@ function resendSendEmail(
     return ['ok' => false, 'error' => $errMsg];
 }
 
+function googleScriptSendEmail(
+    string $scriptUrl,
+    string $toEmail,
+    string $toName,
+    string $subject,
+    string $htmlBody,
+    string $textBody,
+    string $fromName = 'KCC Document Management System'
+): array {
+    $payload = [
+        'to' => $toEmail,
+        'to_name' => $toName,
+        'subject' => $subject,
+        'html' => $htmlBody,
+        'text' => $textBody,
+        'from_name' => $fromName,
+    ];
+
+    $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+    $ch = curl_init($scriptUrl);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $json,
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/json',
+            'User-Agent: KCC-DOCMS/1.0',
+        ],
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 20,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+
+    $resp = curl_exec($ch);
+    $curlErr = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlErr !== '') {
+        return ['ok' => false, 'error' => 'Connection to Google Apps Script failed: ' . $curlErr];
+    }
+
+    $data = json_decode((string) $resp, true);
+    if (is_array($data) && !empty($data['success'])) {
+        return ['ok' => true, 'id' => $data['message'] ?? 'sent', 'error' => null];
+    }
+
+    $errMsg = $data['error'] ?? (is_string($resp) && strlen($resp) > 0 ? substr(strip_tags($resp), 0, 300) : 'Google Apps Script error');
+    return ['ok' => false, 'error' => $errMsg];
+}
+
 function sendAppEmail(
     array $config,
     string $toEmail,
@@ -189,10 +240,16 @@ function sendAppEmail(
     string $htmlBody,
     string $textBody
 ): array {
+    $fromName = sanitizeHeaderValue((string) ($config['from_name'] ?? 'KCC DOCMS'));
+
+    $scriptUrl = trim((string) (getenv('GMAIL_SCRIPT_URL') ?: ''));
+    if ($scriptUrl !== '') {
+        return googleScriptSendEmail($scriptUrl, $toEmail, $toName, $subject, $htmlBody, $textBody, $fromName);
+    }
+
     $resendApiKey = trim((string) (getenv('RESEND_API_KEY') ?: ''));
     if ($resendApiKey !== '') {
         $fromEmail = trim((string) (getenv('RESEND_FROM') ?: 'onboarding@resend.dev'));
-        $fromName = sanitizeHeaderValue((string) ($config['from_name'] ?? 'KCC DOCMS'));
         return resendSendEmail($resendApiKey, $fromEmail, $fromName, $toEmail, $toName, $subject, $htmlBody, $textBody);
     }
 
