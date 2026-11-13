@@ -129,6 +129,76 @@ function smtpCommand($socket, string $command, array $expectedCodes): string
     return $resp;
 }
 
+function resendSendEmail(
+    string $apiKey,
+    string $fromEmail,
+    string $fromName,
+    string $toEmail,
+    string $toName,
+    string $subject,
+    string $htmlBody,
+    string $textBody
+): array {
+    $payload = [
+        'from' => $fromName !== '' ? "{$fromName} <{$fromEmail}>" : $fromEmail,
+        'to' => [$toEmail],
+        'subject' => $subject,
+        'html' => $htmlBody,
+        'text' => $textBody,
+    ];
+
+    $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    $ctx = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => [
+                'Authorization: Bearer ' . $apiKey,
+                'Content-Type: application/json',
+                'User-Agent: KCC-DOCMS/1.0',
+            ],
+            'content' => $json,
+            'timeout' => 12,
+            'ignore_errors' => true,
+        ],
+        'ssl' => [
+            'verify_peer' => true,
+            'verify_peer_name' => true,
+        ],
+    ]);
+
+    $resp = @file_get_contents('https://api.resend.com/emails', false, $ctx);
+    if ($resp === false) {
+        $err = error_get_last()['message'] ?? 'Network error connecting to Resend API';
+        return ['ok' => false, 'error' => $err];
+    }
+
+    $data = json_decode($resp, true);
+    if (is_array($data) && !empty($data['id'])) {
+        return ['ok' => true, 'id' => $data['id'], 'error' => null];
+    }
+
+    $errMsg = $data['message'] ?? (is_string($resp) ? $resp : 'Unknown error from Resend');
+    return ['ok' => false, 'error' => $errMsg];
+}
+
+function sendAppEmail(
+    array $config,
+    string $toEmail,
+    string $toName,
+    string $subject,
+    string $htmlBody,
+    string $textBody
+): array {
+    $resendApiKey = trim((string) (getenv('RESEND_API_KEY') ?: ''));
+    if ($resendApiKey !== '') {
+        $fromEmail = trim((string) (getenv('RESEND_FROM') ?: 'onboarding@resend.dev'));
+        $fromName = sanitizeHeaderValue((string) ($config['from_name'] ?? 'KCC DOCMS'));
+        return resendSendEmail($resendApiKey, $fromEmail, $fromName, $toEmail, $toName, $subject, $htmlBody, $textBody);
+    }
+
+    return smtpSendEmail($config, $toEmail, $toName, $subject, $htmlBody, $textBody);
+}
+
 function smtpSendEmail(
     array $config,
     string $toEmail,
@@ -357,7 +427,7 @@ function sendDocumentEmailNotification(array $recipient, array $sender, array $d
         . '</div>'
         . '</div></body></html>';
 
-    $result = smtpSendEmail($config, $email, $recName, $subject, $htmlBody, $textBody);
+    $result = sendAppEmail($config, $email, $recName, $subject, $htmlBody, $textBody);
     logEmailAttempt((int) $doc['id'], $email, $recName, $subject, $result['ok'], $result['error']);
     return $result['ok'];
 }

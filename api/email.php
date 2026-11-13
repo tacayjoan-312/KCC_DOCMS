@@ -108,20 +108,22 @@ if ($action === 'test') {
     }
 
     $config = getEmailSettings(true);
-    if (empty($config['smtp_username']) || empty($config['smtp_password'])) {
-        jsonError('Please save your Gmail address and App Password first.', 422);
+    $hasResend = !empty(getenv('RESEND_API_KEY'));
+    $hasSmtp = !empty($config['smtp_username']) && !empty($config['smtp_password']);
+    if (!$hasResend && !$hasSmtp) {
+        jsonError('Please configure your RESEND_API_KEY in Render environment variables, or enter Gmail SMTP credentials.', 422);
     }
 
-    $subject = 'KCC DOCMS - Gmail SMTP Test Email';
-    $text = "Hello {$admin['full_name']},\n\nYour KCC Document Management System Gmail connection is working!\nSent at: " . date('Y-m-d H:i:s');
+    $subject = $hasResend ? 'KCC DOCMS - Resend API Test Email' : 'KCC DOCMS - Gmail SMTP Test Email';
+    $text = "Hello {$admin['full_name']},\n\nYour KCC Document Management System email delivery is working!\nSent at: " . date('Y-m-d H:i:s');
     $html = '<div style="font-family:Arial,sans-serif;padding:20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;">'
-        . '<h2 style="margin-top:0;color:#2563eb;">KCC DOCMS Gmail Connection Verified</h2>'
+        . '<h2 style="margin-top:0;color:#2563eb;">KCC DOCMS Email Delivery Verified</h2>'
         . '<p>Hello <strong>' . htmlspecialchars((string) $admin['full_name'], ENT_QUOTES, 'UTF-8') . '</strong>,</p>'
-        . '<p>Your Gmail SMTP integration is configured and working properly. Receivers will now be notified by email whenever a document is sent to them.</p>'
+        . '<p>Your email integration (' . ($hasResend ? 'Resend HTTPS API' : 'Gmail SMTP') . ') is configured and working properly. Receivers will now be notified by email whenever a document is sent to them.</p>'
         . '<p style="color:#64748b;font-size:12px;">Tested at: ' . date('Y-m-d H:i:s') . '</p>'
         . '</div>';
 
-    $result = smtpSendEmail($config, $targetEmail, (string) $admin['full_name'], $subject, $html, $text);
+    $result = sendAppEmail($config, $targetEmail, (string) $admin['full_name'], $subject, $html, $text);
     logEmailAttempt(null, $targetEmail, (string) $admin['full_name'], $subject, $result['ok'], $result['error']);
 
     if (!$result['ok']) {

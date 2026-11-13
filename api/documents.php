@@ -479,8 +479,9 @@ if ($action === 'upload') {
 
         $emailSummary = ['enabled' => false, 'sent' => 0, 'failed' => 0];
         $emailConfig = getEmailSettings(true);
+        $hasResend = !empty(getenv('RESEND_API_KEY'));
         $hasSmtpCreds = !empty($emailConfig['smtp_username']) && !empty($emailConfig['smtp_password']);
-        if ((int) ($emailConfig['enabled'] ?? 0) === 1 && $hasSmtpCreds) {
+        if ((int) ($emailConfig['enabled'] ?? 0) === 1 && ($hasResend || $hasSmtpCreds)) {
             $emailSummary['enabled'] = true;
             $docPayload = [
                 'id' => $docId,
