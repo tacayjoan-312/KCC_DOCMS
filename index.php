@@ -69,7 +69,7 @@ $csrfToken = getCsrfToken();
     <div id="toast-container" class="toast-container" aria-live="polite"></div>
 
     <!-- Auth Screen -->
-    <div id="auth-screen" class="auth-screen crystal-theme hidden">
+    <div id="auth-screen" class="auth-screen neumorphic-theme hidden">
         <div class="crystal-bg" aria-hidden="true">
             <span class="crystal-shard crystal-shard-1"></span>
             <span class="crystal-shard crystal-shard-2"></span>
