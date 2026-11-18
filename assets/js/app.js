@@ -218,6 +218,28 @@
         $('#process-ring-wrap')?.classList.remove('indeterminate');
     }
 
+    function completeProcessModalWithDone({ title, subtitle, pillLabel = 'UPLOADED', delayMs = 1600, onDone } = {}) {
+        updateProcessModal(100, 'Complete!', 99, pillLabel);
+        if (title) $('#upload-progress-title').textContent = title;
+        if (subtitle) $('#upload-progress-sub').textContent = subtitle;
+        const doneWrap = $('#process-done-actions');
+        const doneBtn = $('#process-done-btn');
+        let finished = false;
+        const finish = () => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            hideProcessModal();
+            doneWrap?.classList.add('hidden');
+            if (typeof onDone === 'function') onDone();
+        };
+        doneWrap?.classList.remove('hidden');
+        const timer = setTimeout(finish, delayMs);
+        if (doneBtn) {
+            doneBtn.onclick = finish;
+        }
+    }
+
     function renderInlinePreviewRing(ringLabel, title, subtitle, pct = 65, indeterminate = true) {
         const clamped = Math.max(0, Math.min(100, Number(pct) || 0));
         const dashOffset = (NEU_RING_CIRCUMFERENCE * (1 - clamped / 100)).toFixed(2);
@@ -3586,14 +3608,17 @@
                     done++;
                 }
 
-                updateProcessModal(100, 'Folder uploaded!', 3, 'DONE');
                 toast(`Folder "${folderName}" (${files.length} file(s)) uploaded.`, 'success');
-                setTimeout(() => {
-                    hideProcessModal();
-                    state.driveFolderId = targetFolderId;
-                    state.driveFolderName = folderName;
-                    loadDrive();
-                }, 450);
+                completeProcessModalWithDone({
+                    title: 'Folder Uploaded!',
+                    subtitle: `"${folderName}" (${files.length} file(s)) saved to File Drive`,
+                    pillLabel: 'UPLOADED',
+                    onDone: () => {
+                        state.driveFolderId = targetFolderId;
+                        state.driveFolderName = folderName;
+                        loadDrive();
+                    },
+                });
             } catch (err) {
                 hideProcessModal();
                 toast(err.message, 'error');
@@ -3711,12 +3736,13 @@
                     done++;
                 }
 
-                updateProcessModal(100, 'Upload complete!', 3, 'DONE');
                 toast(`Uploaded ${droppedItems.length} file(s) to "${targetLabel}".`, 'success');
-                setTimeout(() => {
-                    hideProcessModal();
-                    loadDrive();
-                }, 400);
+                completeProcessModalWithDone({
+                    title: 'Upload Complete!',
+                    subtitle: `${droppedItems.length} file(s) saved to "${targetLabel}"`,
+                    pillLabel: 'UPLOADED',
+                    onDone: () => loadDrive(),
+                });
             } catch (err) {
                 hideProcessModal();
                 toast(err.message, 'error');
@@ -3853,15 +3879,15 @@
 
                 updateProcessModal(96, 'Finalizing File Drive entry...', 2, 'PROCESSING');
                 await new Promise((r) => setTimeout(r, 200));
-                updateProcessModal(100, 'Complete!', 3, 'DONE');
-
                 toast(data.message, 'success');
-                setTimeout(() => {
-                    hideProcessModal();
-                    $('#drive-upload-modal')?.classList.add('hidden');
-                    $('#drive-upload-form')?.reset();
-                    loadDrive();
-                }, 400);
+                $('#drive-upload-modal')?.classList.add('hidden');
+                $('#drive-upload-form')?.reset();
+                completeProcessModalWithDone({
+                    title: 'Uploaded to File Drive!',
+                    subtitle: data.message || 'File(s) saved to your folder',
+                    pillLabel: 'UPLOADED',
+                    onDone: () => loadDrive(),
+                });
             } catch (err) {
                 hideProcessModal();
                 toast(err.message, 'error');
