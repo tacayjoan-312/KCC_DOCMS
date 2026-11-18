@@ -240,6 +240,36 @@
         }
     }
 
+    async function runDeleteWithProgress({ title, subtitle, requestFn, onDone }) {
+        showProcessModal({
+            title: title || 'Removing Item...',
+            subtitle: subtitle || 'Cleaning up storage and database records',
+            ringLabel: 'DELETING',
+            steps: [
+                'Verifying permissions',
+                'Removing file & storage data',
+                'Updating folder & records',
+            ],
+        });
+        updateProcessModal(25, 'Verifying permissions...', 0, 'DELETING');
+        try {
+            await new Promise((r) => setTimeout(r, 120));
+            updateProcessModal(60, 'Removing from server storage...', 1, 'DELETING');
+            const data = await requestFn();
+            toast(data.message, 'success');
+            completeProcessModalWithDone({
+                title: 'Removed Successfully!',
+                subtitle: data.message || 'Item has been deleted',
+                pillLabel: 'DELETED',
+                delayMs: 1200,
+                onDone,
+            });
+        } catch (err) {
+            hideProcessModal();
+            toast(err.message, 'error');
+        }
+    }
+
     function renderInlinePreviewRing(ringLabel, title, subtitle, pct = 65, indeterminate = true) {
         const clamped = Math.max(0, Math.min(100, Number(pct) || 0));
         const dashOffset = (NEU_RING_CIRCUMFERENCE * (1 - clamped / 100)).toFixed(2);
@@ -2777,17 +2807,18 @@
                 if (!window.confirm(`Permanently delete ${code} and remove it for all recipients? This cannot be undone.`)) {
                     return;
                 }
-                try {
-                    const data = await apiFetch('api/documents.php?action=delete', {
+                await runDeleteWithProgress({
+                    title: `Deleting ${code}...`,
+                    subtitle: 'Removing document and recipient copies',
+                    requestFn: () => apiFetch('api/documents.php?action=delete', {
                         method: 'POST',
                         json: { document_id: docId },
-                    });
-                    toast(data.message, 'success');
-                    loadSent();
-                    pollNotifications();
-                } catch (err) {
-                    toast(err.message, 'error');
-                }
+                    }),
+                    onDone: () => {
+                        loadSent();
+                        pollNotifications();
+                    },
+                });
                 return;
             }
 
@@ -4049,16 +4080,15 @@
             if (!window.confirm(`Remove "${name}" permanently from File Drive? This cannot be undone.`)) {
                 return;
             }
-            try {
-                const data = await apiFetch('api/drive.php?action=delete_file', {
+            await runDeleteWithProgress({
+                title: `Removing "${name}"...`,
+                subtitle: 'Deleting file from File Drive & cloud storage',
+                requestFn: () => apiFetch('api/drive.php?action=delete_file', {
                     method: 'POST',
                     json: { document_id: docId },
-                });
-                toast(data.message, 'success');
-                loadDrive();
-            } catch (err) {
-                toast(err.message, 'error');
-            }
+                }),
+                onDone: () => loadDrive(),
+            });
         }
 
         async function openDriveMovePrompt(docId) {
@@ -4127,21 +4157,22 @@
                             toast(err.message, 'error');
                         }
                     } else if (act === 'delete') {
-                        if (!window.confirm(`Delete folder "${folderName}"? Files inside will be moved back to Root.`)) return;
-                        try {
-                            const data = await apiFetch('api/drive.php?action=delete_folder', {
+                        if (!window.confirm(`Delete folder "${folderName}"? Files inside will be moved back to parent folder.`)) return;
+                        await runDeleteWithProgress({
+                            title: `Deleting Folder "${folderName}"...`,
+                            subtitle: 'Moving items to parent folder and removing folder',
+                            requestFn: () => apiFetch('api/drive.php?action=delete_folder', {
                                 method: 'POST',
                                 json: { folder_id: folderId },
-                            });
-                            toast(data.message, 'success');
-                            if (state.driveFolderId === folderId) {
-                                state.driveFolderId = 0;
-                                state.driveFolderName = '';
-                            }
-                            loadDrive();
-                        } catch (err) {
-                            toast(err.message, 'error');
-                        }
+                            }),
+                            onDone: () => {
+                                if (state.driveFolderId === folderId) {
+                                    state.driveFolderId = 0;
+                                    state.driveFolderName = '';
+                                }
+                                loadDrive();
+                            },
+                        });
                     }
                 });
                 document.body.appendChild(menu);
@@ -4244,16 +4275,15 @@
                 if (!window.confirm(`Permanently delete ${code} and remove its file from storage? This cannot be undone.`)) {
                     return;
                 }
-                try {
-                    const data = await apiFetch('api/documents.php?action=delete', {
+                await runDeleteWithProgress({
+                    title: `Deleting ${code}...`,
+                    subtitle: 'Removing file from storage and database',
+                    requestFn: () => apiFetch('api/documents.php?action=delete', {
                         method: 'POST',
                         json: { document_id: docId },
-                    });
-                    toast(data.message, 'success');
-                    loadAdminDocs();
-                } catch (err) {
-                    toast(err.message, 'error');
-                }
+                    }),
+                    onDone: () => loadAdminDocs(),
+                });
             }
         });
 
