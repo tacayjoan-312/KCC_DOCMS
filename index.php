@@ -979,6 +979,92 @@ $csrfToken = getCsrfToken();
         </div>
     </div>
 
+    <!-- Modal: Upload to File Drive -->
+    <div id="drive-upload-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="drive-upload-modal-title">
+        <div class="modal-card modal-md">
+            <div class="modal-header">
+                <h3 id="drive-upload-modal-title">Upload File to Drive</h3>
+                <button type="button" class="icon-btn" data-close-modal="drive-upload-modal">&times;</button>
+            </div>
+            <form id="drive-upload-form" class="modal-body">
+                <div class="form-group">
+                    <label for="drive-upload-folder">Save to Folder</label>
+                    <select id="drive-upload-folder"></select>
+                    <div class="drive-inline-folder-row">
+                        <input type="text" id="drive-inline-folder-name" placeholder="Or create a new folder...">
+                        <button type="button" id="drive-inline-folder-btn" class="btn btn-outline btn-sm">+ Create Folder</button>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="drive-upload-title">Document Title <span class="muted">(optional)</span></label>
+                        <input type="text" id="drive-upload-title" placeholder="Auto-filled from file name if blank">
+                    </div>
+                    <div class="form-group">
+                        <label for="drive-upload-category">Category</label>
+                        <select id="drive-upload-category">
+                            <?php foreach (DOCUMENT_CATEGORIES as $cat): ?>
+                                <option value="<?= htmlspecialchars($cat, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($cat, ENT_QUOTES, 'UTF-8') ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="drive-upload-desc">Notes <span class="muted">(optional)</span></label>
+                    <textarea id="drive-upload-desc" rows="2" placeholder="Optional description..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="drive-upload-files">Select File(s) * <span class="muted">(Max 25 MB each)</span></label>
+                    <input type="file" id="drive-upload-files" multiple required>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" data-close-modal="drive-upload-modal">Cancel</button>
+                    <button type="submit" id="drive-upload-submit-btn" class="btn btn-primary">Upload to Folder</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Send File from File Drive -->
+    <div id="drive-send-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="drive-send-modal-title">
+        <div class="modal-card modal-md">
+            <div class="modal-header">
+                <div>
+                    <span id="drive-send-doc-code" class="doc-code">DOC</span>
+                    <h3 id="drive-send-modal-title" style="margin-top:4px">Send File to Recipients</h3>
+                </div>
+                <button type="button" class="icon-btn" data-close-modal="drive-send-modal">&times;</button>
+            </div>
+            <form id="drive-send-form" class="modal-body">
+                <input type="hidden" id="drive-send-doc-id">
+                <div class="form-group">
+                    <div id="drive-send-file-label" class="selected-file-row" style="padding:10px 12px;font-weight:600"></div>
+                </div>
+                <div class="form-group">
+                    <label for="drive-send-priority">Priority</label>
+                    <select id="drive-send-priority">
+                        <option value="normal">Normal</option>
+                        <option value="urgent">Urgent</option>
+                        <option value="confidential">Confidential</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="drive-send-desc">Message / Notes <span class="muted">(optional)</span></label>
+                    <textarea id="drive-send-desc" rows="2" placeholder="Optional instructions for recipients..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Select Recipients * <span id="drive-send-rec-count" class="muted">(0 selected)</span></label>
+                    <input type="text" id="drive-send-rec-search" placeholder="Search users by name or department..." style="margin-bottom:8px">
+                    <div id="drive-send-recipients-list" class="recipients-box" style="max-height:190px;overflow-y:auto"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" data-close-modal="drive-send-modal">Cancel</button>
+                    <button type="submit" id="drive-send-submit-btn" class="btn btn-primary">Send Document</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Process Progress Modal (Sending, Viewing/Previewing, Processing, Downloading) -->
     <div id="upload-progress-modal" class="modal-overlay hidden" aria-modal="true" role="dialog">
         <div class="modal-card upload-progress-card neu-process-card">

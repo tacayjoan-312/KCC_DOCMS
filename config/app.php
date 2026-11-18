@@ -718,6 +718,144 @@ function ensureDriveSchema(PDO $pdo): void
     }
 }
 
+function parseValidRecipients(PDO $pdo, mixed $rawRecipients, int $excludeUserId): array
+{
+    if (!is_array($rawRecipients)) {
+        $rawRecipients = explode(',', (string) $rawRecipients);
+    }
+
+    $recipientIds = array_values(array_unique(array_filter(array_map('intval', $rawRecipients), fn ($id) => $id > 0)));
+    if (empty($recipientIds)) {
+        jsonError('Please select at least one recipient.', 422);
+    }
+
+    $placeholders = implode(',', array_fill(0, count($recipientIds), '?'));
+    $recCheck = $pdo->prepare("SELECT id, full_name, email FROM users WHERE id IN ($placeholders) AND status = 'active'");
+    $recCheck->execute($recipientIds);
+    $validRecipients = $recCheck->fetchAll();
+    $validRecipients = array_values(array_filter(
+        $validRecipients,
+        fn ($r) => (int) $r['id'] !== $excludeUserId
+    ));
+
+    if (empty($validRecipients)) {
+        jsonError('No valid active recipients found.', 422);
+    }
+    return $validRecipients;
+}
+
+function processUploadedDocumentFile(array $file): array
+{
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        $errCode = (int) ($file['error'] ?? -1);
+        $errMessages = [
+            UPLOAD_ERR_INI_SIZE => 'File exceeds server maximum upload size.',
+            UPLOAD_ERR_FORM_SIZE => 'File exceeds form maximum upload size.',
+            UPLOAD_ERR_PARTIAL => 'File was only partially uploaded.',
+            UPLOAD_ERR_NO_FILE => 'No file was uploaded.',
+        ];
+        jsonError($errMessages[$errCode] ?? 'File upload failed.', 422);
+    }
+
+    $fileSize = (int) ($file['size'] ?? 0);
+    if ($fileSize <= 0 || $fileSize > MAX_UPLOAD_BYTES) {
+        jsonError('File size must be between 1 byte and 25 MB.', 422);
+    }
+
+    $originalName = basename((string) ($file['name'] ?? 'document'));
+    $originalName = preg_replace('/[^\w.\- ()]/u', '_', $originalName) ?: 'document';
+    $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+
+    if (!in_array($ext, ALLOWED_EXTENSIONS, true)) {
+        jsonError('File type ".' . $ext . '" is not allowed. Allowed: ' . implode(', ', ALLOWED_EXTENSIONS), 422);
+    }
+
+    $tmpPath = (string) ($file['tmp_name'] ?? '');
+    if (!is_uploaded_file($tmpPath)) {
+        jsonError('Invalid file upload.', 400);
+    }
+
+    ensureUploadDir();
+    $storedFilename = bin2hex(random_bytes(16)) . '.' . $ext;
+    $destPath = UPLOAD_DIR . DIRECTORY_SEPARATOR . $storedFilename;
+
+    if (!move_uploaded_file($tmpPath, $destPath)) {
+        jsonError('Failed to store uploaded file.', 500);
+    }
+
+    return [
+        'original_filename' => $originalName,
+        'stored_filename' => $storedFilename,
+        'dest_path' => $destPath,
+        'file_size' => $fileSize,
+        'mime_type' => detectMimeType($destPath, $ext),
+        'file_ext' => $ext,
+    ];
+}
+
+function collectUploadedFiles(): array
+{
+    $rawFiles = [];
+
+    if (!empty($_FILES['files']) && is_array($_FILES['files'])) {
+        $f = $_FILES['files'];
+        if (is_array($f['name'] ?? null)) {
+            $count = count($f['name']);
+            for ($i = 0; $i < $count; $i++) {
+                if ((int) ($f['error'][$i] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+                    continue;
+                }
+                $rawFiles[] = [
+                    'name' => $f['name'][$i] ?? '',
+                    'type' => $f['type'][$i] ?? '',
+                    'tmp_name' => $f['tmp_name'][$i] ?? '',
+                    'error' => $f['error'][$i] ?? UPLOAD_ERR_NO_FILE,
+                    'size' => $f['size'][$i] ?? 0,
+                ];
+            }
+        } elseif ((int) ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            $rawFiles[] = $f;
+        }
+    }
+
+    if (!empty($_FILES['file']) && is_array($_FILES['file'])) {
+        $f = $_FILES['file'];
+        if (is_array($f['name'] ?? null)) {
+            $count = count($f['name']);
+            for ($i = 0; $i < $count; $i++) {
+                if ((int) ($f['error'][$i] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+                    continue;
+                }
+                $rawFiles[] = [
+                    'name' => $f['name'][$i] ?? '',
+                    'type' => $f['type'][$i] ?? '',
+                    'tmp_name' => $f['tmp_name'][$i] ?? '',
+                    'error' => $f['error'][$i] ?? UPLOAD_ERR_NO_FILE,
+                    'size' => $f['size'][$i] ?? 0,
+                ];
+            }
+        } elseif ((int) ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+            $rawFiles[] = $f;
+        }
+    }
+
+    $processed = [];
+    try {
+        foreach ($rawFiles as $rf) {
+            $processed[] = processUploadedDocumentFile($rf);
+        }
+    } catch (Throwable $e) {
+        foreach ($processed as $p) {
+            if (is_file($p['dest_path'])) {
+                @unlink($p['dest_path']);
+            }
+        }
+        throw $e;
+    }
+
+    return $processed;
+}
+
 function getAppBasePath(): string
 {
     $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));

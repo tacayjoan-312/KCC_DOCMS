@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/config/app.php';
+require_once dirname(__DIR__) . '/config/mailer.php';
 
 $user = requireDriveAccess();
 $action = $_GET['action'] ?? 'overview';
@@ -118,7 +119,223 @@ if ($method === 'GET' && $action === 'overview') {
 
 if ($method === 'POST') {
     verifyCsrf();
+
+    if ($action === 'upload_file') {
+        $folderId = (int) ($_POST['folder_id'] ?? 0);
+        $targetFolder = $folderId > 0 ? $folderId : null;
+        if ($targetFolder !== null) {
+            $fCheck = $pdo->prepare('SELECT id FROM document_folders WHERE id = ? LIMIT 1');
+            $fCheck->execute([$targetFolder]);
+            if (!$fCheck->fetch()) {
+                jsonError('Selected folder not found.', 404);
+            }
+        }
+
+        $uploadedFiles = collectUploadedFiles();
+        if (empty($uploadedFiles)) {
+            jsonError('Please attach at least one file to upload.', 422);
+        }
+
+        $primaryFile = $uploadedFiles[0];
+        $title = trim((string) ($_POST['title'] ?? ''));
+        if ($title === '') {
+            $title = pathinfo($primaryFile['original_filename'], PATHINFO_FILENAME) ?: $primaryFile['original_filename'];
+        }
+        if (mb_strlen($title) > 255) {
+            jsonError('Title must be 255 characters or fewer.', 422);
+        }
+
+        $category = trim((string) ($_POST['category'] ?? 'Other'));
+        if (!in_array($category, DOCUMENT_CATEGORIES, true)) {
+            $category = 'Other';
+        }
+        $description = trim((string) ($_POST['description'] ?? ''));
+        $totalFileSize = array_sum(array_map(static fn(array $f): int => (int) $f['file_size'], $uploadedFiles));
+        $fileCount = count($uploadedFiles);
+
+        $pdo->beginTransaction();
+        try {
+            $docCode = generateDocumentCode($pdo);
+            $stmtDoc = $pdo->prepare(
+                'INSERT INTO documents (doc_code, sender_id, folder_id, title, category, description, original_filename, stored_filename, file_size, mime_type, file_ext, priority)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "normal")'
+            );
+            $stmtDoc->execute([
+                $docCode,
+                (int) $user['id'],
+                $targetFolder,
+                $title,
+                $category,
+                $description,
+                $primaryFile['original_filename'],
+                $primaryFile['stored_filename'],
+                $totalFileSize,
+                $primaryFile['mime_type'],
+                $primaryFile['file_ext'],
+            ]);
+            $docId = (int) $pdo->lastInsertId();
+
+            $stmtFile = $pdo->prepare(
+                'INSERT INTO document_files (document_id, original_filename, stored_filename, file_size, mime_type, file_ext, sort_order)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)'
+            );
+            foreach ($uploadedFiles as $idx => $uf) {
+                $stmtFile->execute([
+                    $docId,
+                    $uf['original_filename'],
+                    $uf['stored_filename'],
+                    $uf['file_size'],
+                    $uf['mime_type'],
+                    $uf['file_ext'],
+                    $idx,
+                ]);
+            }
+
+            if ($targetFolder !== null) {
+                $pdo->prepare('UPDATE document_folders SET updated_at = NOW() WHERE id = ?')->execute([$targetFolder]);
+            }
+
+            $pdo->commit();
+
+            foreach ($uploadedFiles as $uf) {
+                saveFileToDbChunks($pdo, (string) $uf['stored_filename'], (string) $uf['dest_path']);
+            }
+
+            logActivity(
+                (int) $user['id'],
+                $docId,
+                'drive_upload',
+                sprintf('Uploaded %s (%d file(s)) to File Drive%s', $docCode, $fileCount, $targetFolder ? " folder #{$targetFolder}" : '')
+            );
+
+            jsonResponse([
+                'success' => true,
+                'document_id' => $docId,
+                'doc_code' => $docCode,
+                'file_count' => $fileCount,
+                'message' => "{$docCode} uploaded to File Drive.",
+            ]);
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            foreach ($uploadedFiles as $uf) {
+                if (is_file($uf['dest_path'])) {
+                    @unlink($uf['dest_path']);
+                }
+            }
+            throw $e;
+        }
+    }
+
     $body = getJsonBody();
+
+    if ($action === 'send_file') {
+        $docId = (int) ($body['document_id'] ?? 0);
+        if ($docId <= 0) {
+            jsonError('Invalid document ID.', 400);
+        }
+
+        $docStmt = $pdo->prepare('SELECT * FROM documents WHERE id = ? LIMIT 1');
+        $docStmt->execute([$docId]);
+        $doc = $docStmt->fetch();
+        if (!$doc) {
+            jsonError('Document not found.', 404);
+        }
+
+        $validRecipients = parseValidRecipients($pdo, $body['recipients'] ?? [], (int) $user['id']);
+        $priority = trim((string) ($body['priority'] ?? ($doc['priority'] ?? 'normal')));
+        if (!in_array($priority, ['normal', 'urgent', 'confidential'], true)) {
+            $priority = 'normal';
+        }
+        $note = trim((string) ($body['description'] ?? ''));
+
+        $pdo->beginTransaction();
+        try {
+            if ($note !== '' && $note !== (string) $doc['description']) {
+                $pdo->prepare('UPDATE documents SET priority = ?, description = ? WHERE id = ?')
+                    ->execute([$priority, $note, $docId]);
+            } else {
+                $pdo->prepare('UPDATE documents SET priority = ? WHERE id = ?')
+                    ->execute([$priority, $docId]);
+            }
+
+            $existingStmt = $pdo->prepare('SELECT recipient_id FROM document_recipients WHERE document_id = ?');
+            $existingStmt->execute([$docId]);
+            $existingIds = array_map('intval', $existingStmt->fetchAll(PDO::FETCH_COLUMN));
+            $existingSet = array_flip($existingIds);
+
+            $stmtRec = $pdo->prepare('INSERT INTO document_recipients (document_id, recipient_id) VALUES (?, ?)');
+            $stmtNotif = $pdo->prepare(
+                'INSERT INTO notifications (user_id, document_id, type, title, message) VALUES (?, ?, "document_received", ?, ?)'
+            );
+
+            $priorityTag = $priority === 'urgent' ? '[URGENT] ' : ($priority === 'confidential' ? '[CONFIDENTIAL] ' : '');
+            $newlySentRecipients = [];
+            foreach ($validRecipients as $rec) {
+                $recId = (int) $rec['id'];
+                if (!isset($existingSet[$recId])) {
+                    $stmtRec->execute([$docId, $recId]);
+                }
+                $stmtNotif->execute([
+                    $recId,
+                    $docId,
+                    $priorityTag . 'Document Received: ' . $doc['title'],
+                    $user['full_name'] . ' sent "' . $doc['original_filename'] . '" (' . $doc['doc_code'] . ').',
+                ]);
+                $newlySentRecipients[] = $rec;
+            }
+
+            $pdo->commit();
+
+            logActivity(
+                (int) $user['id'],
+                $docId,
+                'drive_send',
+                sprintf('Sent %s from File Drive to %d recipient(s)', $doc['doc_code'], count($newlySentRecipients))
+            );
+
+            $emailSummary = ['enabled' => false, 'sent' => 0, 'failed' => 0];
+            $emailConfig = getEmailSettings(true);
+            $hasScript = !empty(getenv('GMAIL_SCRIPT_URL'));
+            $hasResend = !empty(getenv('RESEND_API_KEY'));
+            $hasSmtpCreds = !empty($emailConfig['smtp_username']) && !empty($emailConfig['smtp_password']);
+            if ((int) ($emailConfig['enabled'] ?? 0) === 1 && ($hasScript || $hasResend || $hasSmtpCreds)) {
+                $emailSummary['enabled'] = true;
+                $docPayload = [
+                    'id' => $docId,
+                    'doc_code' => $doc['doc_code'],
+                    'title' => $doc['title'],
+                    'category' => $doc['category'],
+                    'priority' => $priority,
+                    'original_filename' => $doc['original_filename'],
+                    'file_size' => (int) $doc['file_size'],
+                    'description' => $note !== '' ? $note : (string) $doc['description'],
+                ];
+                foreach ($newlySentRecipients as $rec) {
+                    $res = sendDocumentNotificationEmail($rec, $user, $docPayload);
+                    if (!empty($res['success'])) {
+                        $emailSummary['sent']++;
+                    } else {
+                        $emailSummary['failed']++;
+                    }
+                }
+            }
+
+            jsonResponse([
+                'success' => true,
+                'doc_code' => $doc['doc_code'],
+                'recipient_count' => count($newlySentRecipients),
+                'email_summary' => $emailSummary,
+                'message' => "{$doc['doc_code']} sent to " . count($newlySentRecipients) . " recipient(s).",
+            ]);
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
 
     if ($action === 'create_folder') {
         $name = trim((string) ($body['name'] ?? ''));

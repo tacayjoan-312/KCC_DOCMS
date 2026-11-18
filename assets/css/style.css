@@ -3237,3 +3237,14 @@ body {
         flex: 1;
     }
 }
+
+.drive-inline-folder-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    align-items: center;
+}
+
+.drive-inline-folder-row input {
+    flex: 1;
+}

@@ -1375,7 +1375,8 @@
                             <td class="td-actions">
                                 <div class="actions-cell">
                                     <button type="button" class="btn btn-outline btn-xs" data-open-doc="${d.id}">View</button>
-                                    <a href="api/file.php?id=${d.id}&mode=download" class="btn btn-primary btn-xs">DL</a>
+                                    <button type="button" class="btn btn-primary btn-xs" data-drive-send-file="${d.id}">Send</button>
+                                    <a href="api/file.php?id=${d.id}&mode=download" class="btn btn-outline btn-xs">DL</a>
                                     <button type="button" class="btn btn-outline btn-xs" data-drive-move-file="${d.id}">Move</button>
                                 </div>
                             </td>
@@ -3023,8 +3024,216 @@
             }
         });
 
+        function populateDriveUploadFolders(selectedId = 0) {
+            const sel = $('#drive-upload-folder');
+            if (!sel) return;
+            const folders = state.driveData?.folders || [];
+            sel.innerHTML = [
+                '<option value="0">Root (No Folder)</option>',
+                ...folders.map((f) => `<option value="${Number(f.id)}">${escapeHtml(f.name)} (${Number(f.file_count)} file(s))</option>`),
+            ].join('');
+            sel.value = String(selectedId || 0);
+        }
+
         $('#drive-upload-btn')?.addEventListener('click', () => {
-            switchView('send');
+            $('#drive-upload-form')?.reset();
+            populateDriveUploadFolders(state.driveFolderId || 0);
+            $('#drive-upload-modal')?.classList.remove('hidden');
+        });
+
+        $('#drive-inline-folder-btn')?.addEventListener('click', async () => {
+            const input = $('#drive-inline-folder-name');
+            const name = (input?.value || '').trim();
+            if (!name) {
+                toast('Please enter a folder name.', 'error');
+                input?.focus();
+                return;
+            }
+            try {
+                const data = await apiFetch('api/drive.php?action=create_folder', {
+                    method: 'POST',
+                    json: { name },
+                });
+                toast(data.message, 'success');
+                if (input) input.value = '';
+                await loadDrive();
+                populateDriveUploadFolders(data.folder_id || 0);
+            } catch (err) {
+                toast(err.message, 'error');
+            }
+        });
+
+        $('#drive-upload-form')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fileInput = $('#drive-upload-files');
+            const files = Array.from(fileInput?.files || []);
+            if (!files.length) {
+                toast('Please select at least one file to upload.', 'error');
+                return;
+            }
+
+            const folderId = Number($('#drive-upload-folder')?.value || 0);
+            const btn = $('#drive-upload-submit-btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Uploading...';
+            }
+
+            showProcessModal({
+                title: 'Uploading to File Drive...',
+                subtitle: 'Saving file(s) to your selected folder',
+                ringLabel: 'UPLOADING',
+                steps: [
+                    'Preparing attached file(s)',
+                    'Uploading to File Drive storage',
+                    'Saving folder & database backup',
+                ],
+            });
+            updateProcessModal(12, `Preparing ${files.length} file(s)...`, 0, 'UPLOADING');
+
+            try {
+                const fd = new FormData();
+                fd.append('folder_id', String(folderId));
+                fd.append('title', ($('#drive-upload-title')?.value || '').trim());
+                fd.append('category', $('#drive-upload-category')?.value || 'Other');
+                fd.append('description', ($('#drive-upload-desc')?.value || '').trim());
+                files.forEach((f) => fd.append('files[]', f));
+
+                const data = await apiUploadWithProgress('api/drive.php?action=upload_file', fd, (loaded, total) => {
+                    const pct = Math.min(82, 14 + Math.round((loaded / total) * 68));
+                    updateProcessModal(pct, `Uploading ${formatBytes(loaded)} / ${formatBytes(total)}...`, 1, 'UPLOADING');
+                });
+
+                updateProcessModal(96, 'Finalizing File Drive entry...', 2, 'PROCESSING');
+                await new Promise((r) => setTimeout(r, 200));
+                updateProcessModal(100, 'Complete!', 3, 'DONE');
+
+                toast(data.message, 'success');
+                setTimeout(() => {
+                    hideProcessModal();
+                    $('#drive-upload-modal')?.classList.add('hidden');
+                    $('#drive-upload-form')?.reset();
+                    loadDrive();
+                }, 400);
+            } catch (err) {
+                hideProcessModal();
+                toast(err.message, 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Upload to Folder';
+                }
+            }
+        });
+
+        async function openDriveSendModal(docId) {
+            const doc = (state.driveData?.files || []).find((f) => Number(f.id) === Number(docId));
+            $('#drive-send-doc-id').value = String(docId);
+            $('#drive-send-doc-code').textContent = doc?.doc_code || `DOC #${docId}`;
+            $('#drive-send-file-label').textContent = doc
+                ? `${doc.original_filename || doc.title} (${formatBytes(doc.file_size)})`
+                : `Document #${docId}`;
+            $('#drive-send-desc').value = doc?.description || '';
+            $('#drive-send-priority').value = doc?.priority || 'normal';
+            $('#drive-send-rec-search').value = '';
+
+            if (!state.recipients.length) {
+                try {
+                    const res = await apiFetch('api/users.php?action=recipients');
+                    state.recipients = res.recipients || [];
+                } catch { /* ignore */ }
+            }
+
+            const renderDriveSendRecipients = (q = '') => {
+                const box = $('#drive-send-recipients-list');
+                const ql = q.trim().toLowerCase();
+                const checkedSet = new Set($$('input[name="drive_send_recipient"]:checked').map((cb) => cb.value));
+                const list = state.recipients.filter((u) =>
+                    !ql || `${u.full_name} ${u.username} ${u.department}`.toLowerCase().includes(ql)
+                );
+                if (!list.length) {
+                    box.innerHTML = '<div class="muted" style="padding:10px">No matching users found.</div>';
+                    return;
+                }
+                box.innerHTML = list.map((u) => `
+                    <label class="recipient-chip">
+                        <input type="checkbox" name="drive_send_recipient" value="${u.id}" ${checkedSet.has(String(u.id)) ? 'checked' : ''}>
+                        <div>
+                            <div><strong>${escapeHtml(u.full_name)}</strong></div>
+                            <div class="muted">${escapeHtml(u.department)} &bull; @${escapeHtml(u.username)}</div>
+                        </div>
+                    </label>
+                `).join('');
+            };
+
+            renderDriveSendRecipients();
+            $('#drive-send-rec-count').textContent = '(0 selected)';
+            $('#drive-send-rec-search').oninput = (ev) => renderDriveSendRecipients(ev.target.value);
+            $('#drive-send-recipients-list').onchange = () => {
+                const count = $$('input[name="drive_send_recipient"]:checked').length;
+                $('#drive-send-rec-count').textContent = `(${count} selected)`;
+            };
+            $('#drive-send-modal')?.classList.remove('hidden');
+        }
+
+        $('#drive-send-form')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const docId = Number($('#drive-send-doc-id')?.value || 0);
+            const recipients = $$('input[name="drive_send_recipient"]:checked').map((cb) => Number(cb.value));
+            if (!recipients.length) {
+                toast('Please select at least one recipient.', 'error');
+                return;
+            }
+
+            const btn = $('#drive-send-submit-btn');
+            if (btn) {
+                btn.disabled = true;
+                btn.textContent = 'Sending...';
+            }
+
+            showProcessModal({
+                title: 'Sending Document from Drive...',
+                subtitle: 'Creating recipient receipts and dispatching notifications',
+                ringLabel: 'SENDING',
+                steps: [
+                    'Validating recipients',
+                    'Recording delivery receipts',
+                    'Dispatching notifications',
+                ],
+            });
+            updateProcessModal(25, 'Validating recipients...', 0, 'SENDING');
+
+            try {
+                const data = await apiFetch('api/drive.php?action=send_file', {
+                    method: 'POST',
+                    json: {
+                        document_id: docId,
+                        recipients,
+                        priority: $('#drive-send-priority')?.value || 'normal',
+                        description: ($('#drive-send-desc')?.value || '').trim(),
+                    },
+                });
+                updateProcessModal(100, 'Sent!', 3, 'DONE');
+                let msg = data.message || 'Document sent!';
+                if (data.email_summary && data.email_summary.enabled) {
+                    msg += ` Emails sent: ${data.email_summary.sent}, failed: ${data.email_summary.failed}.`;
+                }
+                toast(msg, 'success');
+                setTimeout(() => {
+                    hideProcessModal();
+                    $('#drive-send-modal')?.classList.add('hidden');
+                    loadDrive();
+                    pollNotifications();
+                }, 400);
+            } catch (err) {
+                hideProcessModal();
+                toast(err.message, 'error');
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Send Document';
+                }
+            }
         });
 
         $('#drive-back-root-btn')?.addEventListener('click', () => {
@@ -3151,6 +3360,7 @@
                 menu.style.left = `${Math.min(window.innerWidth - 180, rect.left - 120)}px`;
                 menu.innerHTML = `
                     <button type="button" data-act="preview">View / Preview</button>
+                    <button type="button" data-act="send">Send to Users...</button>
                     <button type="button" data-act="download">Download</button>
                     <button type="button" data-act="move">Move to Folder...</button>
                 `;
@@ -3158,10 +3368,17 @@
                     const act = me.target.closest('button')?.dataset.act;
                     closeDriveContextMenu();
                     if (act === 'preview') openDocumentModal(docId);
+                    if (act === 'send') openDriveSendModal(docId);
                     if (act === 'download') downloadFileWithProgress(`api/file.php?id=${docId}&mode=download`);
                     if (act === 'move') openDriveMovePrompt(docId);
                 });
                 document.body.appendChild(menu);
+                return;
+            }
+
+            const sendBtn = e.target.closest('[data-drive-send-file]');
+            if (sendBtn) {
+                openDriveSendModal(Number(sendBtn.dataset.driveSendFile));
                 return;
             }
 
