@@ -209,6 +209,10 @@ $csrfToken = getCsrfToken();
 
                 <div id="admin-nav-section" class="hidden">
                     <div class="nav-section-label">Administration</div>
+                    <button class="nav-item" data-view="admin-drive">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z"/></svg>
+                        <span>File Drive</span>
+                    </button>
                     <button class="nav-item" data-view="admin-docs">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
                         <span>All Documents</span>
@@ -457,6 +461,64 @@ $csrfToken = getCsrfToken();
                             <button type="button" id="notifs-mark-all" class="btn btn-outline btn-sm">Mark All as Read</button>
                         </div>
                         <div id="notifications-full-list" class="card-body"></div>
+                    </div>
+                </section>
+
+                <!-- VIEW: Admin File Drive (Future-ready for all users) -->
+                <section id="view-admin-drive" class="view-section hidden">
+                    <div id="drive-storage-card" class="card drive-storage-card">
+                        <div class="drive-storage-head">
+                            <h3>Storage Overview</h3>
+                            <span id="drive-storage-summary" class="drive-storage-summary">Loading...</span>
+                        </div>
+                        <div id="drive-storage-bar" class="drive-storage-bar"></div>
+                        <div id="drive-storage-legend" class="drive-storage-legend"></div>
+                    </div>
+
+                    <div class="drive-section">
+                        <div class="drive-section-head">
+                            <div class="drive-title-group">
+                                <h3>Folders</h3>
+                                <div id="drive-folder-breadcrumb" class="drive-breadcrumb hidden">
+                                    <button type="button" id="drive-back-root-btn" class="link-btn">All Folders</button>
+                                    <span>/</span>
+                                    <strong id="drive-active-folder-name"></strong>
+                                </div>
+                            </div>
+                            <div class="drive-head-actions">
+                                <button type="button" id="drive-new-folder-btn" class="btn btn-outline btn-sm">+ New Folder</button>
+                                <button type="button" id="drive-upload-btn" class="btn btn-primary btn-sm">Upload File</button>
+                            </div>
+                        </div>
+                        <div id="drive-folders-grid" class="drive-folders-grid"></div>
+                    </div>
+
+                    <div class="drive-section">
+                        <div class="drive-section-head">
+                            <h3>Recently Opened Files</h3>
+                            <div class="drive-head-actions">
+                                <div class="drive-view-toggle" data-target="recent">
+                                    <button type="button" class="drive-toggle-btn" data-mode="list" title="List view">&#9776;</button>
+                                    <button type="button" class="drive-toggle-btn active" data-mode="grid" title="Grid view">&#9638;</button>
+                                </div>
+                                <input type="text" id="drive-recent-search" class="drive-search-input" placeholder="Search files...">
+                            </div>
+                        </div>
+                        <div id="drive-recent-wrap" class="drive-cards-grid"></div>
+                    </div>
+
+                    <div class="drive-section">
+                        <div class="drive-section-head">
+                            <h3>All Files</h3>
+                            <div class="drive-head-actions">
+                                <div class="drive-view-toggle" data-target="all">
+                                    <button type="button" class="drive-toggle-btn active" data-mode="list" title="List view">&#9776;</button>
+                                    <button type="button" class="drive-toggle-btn" data-mode="grid" title="Grid view">&#9638;</button>
+                                </div>
+                                <input type="text" id="drive-all-search" class="drive-search-input" placeholder="Search files...">
+                            </div>
+                        </div>
+                        <div id="drive-all-wrap"></div>
                     </div>
                 </section>
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kcc-docms-static-v12';
+const CACHE_NAME = 'kcc-docms-static-v13';
 const STATIC_ASSETS = [
   './manifest.webmanifest',
   './assets/css/style.css',

@@ -671,6 +671,53 @@ function requireAdmin(): array
     return $user;
 }
 
+function canAccessDrive(array $user): bool
+{
+    // Currently restricted to Admin users; update this gate to enable for other roles in the future.
+    return ($user['role'] ?? '') === 'admin';
+}
+
+function requireDriveAccess(): array
+{
+    $user = requireAuth();
+    if (!canAccessDrive($user)) {
+        jsonError('File Drive access is currently restricted to administrators.', 403);
+    }
+    return $user;
+}
+
+function ensureDriveSchema(PDO $pdo): void
+{
+    static $checked = false;
+    if ($checked) {
+        return;
+    }
+    $checked = true;
+
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS `document_folders` (
+            `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `name` VARCHAR(120) NOT NULL,
+            `owner_id` INT UNSIGNED NOT NULL,
+            `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_doc_folders_owner` (`owner_id`),
+            CONSTRAINT `fk_doc_folders_owner` FOREIGN KEY (`owner_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+
+    $col = $pdo->query("SHOW COLUMNS FROM `documents` LIKE 'folder_id'")->fetch();
+    if (!$col) {
+        $pdo->exec('ALTER TABLE `documents` ADD COLUMN `folder_id` INT UNSIGNED NULL DEFAULT NULL');
+        try {
+            $pdo->exec('ALTER TABLE `documents` ADD KEY `idx_documents_folder` (`folder_id`)');
+        } catch (Throwable $e) {
+            // Index may already exist
+        }
+    }
+}
+
 function getAppBasePath(): string
 {
     $script = str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));

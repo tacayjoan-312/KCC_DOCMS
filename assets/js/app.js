@@ -24,6 +24,11 @@
         audioUnlocked: false,
         pendingNotificationSound: false,
         deferredPrompt: null,
+        driveFolderId: 0,
+        driveFolderName: '',
+        driveRecentMode: 'grid',
+        driveAllMode: 'list',
+        driveData: null,
         pendingDeepLink: (() => {
             const params = new URLSearchParams(window.location.search);
             return {
@@ -39,6 +44,7 @@
         inbox: 'Received Files (Inbox)',
         sent: 'Sent Documents',
         notifications: 'Notifications',
+        'admin-drive': 'File Drive',
         'admin-docs': 'Admin: Manage All Documents',
         'admin-users': 'Admin: Manage Users',
         'admin-email': 'Admin: Gmail / Email Notifications',
@@ -482,9 +488,16 @@
         state.notifTimer = setInterval(pollNotifications, 10000);
     }
 
+    function canAccessDrive(user) {
+        // Currently restricted to Admin users; update this gate to enable for other roles in the future.
+        return user?.role === 'admin';
+    }
+
     // ---- Navigation ----
     function switchView(viewName) {
-        if (viewName.startsWith('admin-') && state.user?.role !== 'admin') {
+        if (viewName === 'admin-drive') {
+            if (!canAccessDrive(state.user)) viewName = 'dashboard';
+        } else if (viewName.startsWith('admin-') && state.user?.role !== 'admin') {
             viewName = 'dashboard';
         }
         state.currentView = viewName;
@@ -507,6 +520,7 @@
         if (viewName === 'inbox') loadInbox();
         if (viewName === 'sent') loadSent();
         if (viewName === 'notifications') loadNotificationsView();
+        if (viewName === 'admin-drive') loadDrive();
         if (viewName === 'admin-docs') loadAdminDocs();
         if (viewName === 'admin-users') loadAdminUsers();
         if (viewName === 'admin-email') loadAdminEmail();
@@ -1126,6 +1140,268 @@
             `;
         } catch (err) {
             wrap.innerHTML = `<div class="empty-state">${escapeHtml(err.message)}</div>`;
+        }
+    }
+
+    // ---- File Drive (Admin-only now, future-ready for all users) ----
+    function closeDriveContextMenu() {
+        document.querySelectorAll('.drive-context-menu').forEach((m) => m.remove());
+    }
+
+    function timeAgoShort(dtStr) {
+        if (!dtStr) return 'Recently';
+        const dt = new Date(String(dtStr).replace(' ', 'T'));
+        if (Number.isNaN(dt.getTime())) return formatDate(dtStr);
+        const diffSec = Math.max(0, Math.floor((Date.now() - dt.getTime()) / 1000));
+        if (diffSec < 60) return 'Just now';
+        const mins = Math.floor(diffSec / 60);
+        if (mins < 60) return `${mins} min ago`;
+        const hrs = Math.floor(mins / 60);
+        if (hrs < 24) return `${hrs} hr ago`;
+        const days = Math.floor(hrs / 24);
+        if (days === 1) return 'Yesterday';
+        if (days < 7) return `${days} days ago`;
+        return formatDate(dtStr);
+    }
+
+    function getDriveExtClass(ext) {
+        const e = String(ext || '').toLowerCase();
+        if (e === 'docx' || e === 'doc') return 'ext-docx';
+        if (e === 'pdf') return 'ext-pdf';
+        if (e === 'xlsx' || e === 'xls' || e === 'csv') return 'ext-xlsx';
+        if (e === 'pptx' || e === 'ppt') return 'ext-pptx';
+        if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(e)) return 'ext-img';
+        return 'ext-other';
+    }
+
+    function renderDriveFolderSvg(shared = false) {
+        const iconMarkup = shared
+            ? '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="#fff" stroke-width="1.8" fill="none"/><circle cx="9" cy="11" r="2.5" stroke="#fff" stroke-width="1.8" fill="none"/><path d="M21 21v-2a3.5 3.5 0 0 0-2.5-3.3" stroke="#fff" stroke-width="1.8" fill="none"/>'
+            : '<path d="M15 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" stroke="#fff" stroke-width="1.8" fill="none"/><circle cx="9" cy="10" r="2.6" stroke="#fff" stroke-width="1.8" fill="none"/>';
+        return `
+            <svg class="drive-folder-svg" viewBox="0 0 100 84" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <linearGradient id="drvFldBack" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stop-color="#93c5fd"/>
+                        <stop offset="100%" stop-color="#60a5fa"/>
+                    </linearGradient>
+                    <linearGradient id="drvFldFront" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#7dd3fc"/>
+                        <stop offset="100%" stop-color="#38bdf8"/>
+                    </linearGradient>
+                </defs>
+                <path d="M6 14C6 9 10 6 15 6H35C39 6 42 8 44 12L47 16H85C90 16 94 20 94 25V68C94 74 89 78 83 78H17C11 78 6 74 6 68V14Z" fill="url(#drvFldBack)"/>
+                <rect x="14" y="21" width="72" height="16" rx="4" fill="#ffffff" opacity="0.92"/>
+                <path d="M6 31C6 27 9 24 13 24H87C91 24 94 27 94 31V68C94 74 89 78 83 78H17C11 78 6 74 6 68V31Z" fill="url(#drvFldFront)" opacity="0.95"/>
+                <g transform="translate(10, 48) scale(0.82)">${iconMarkup}</g>
+            </svg>
+        `;
+    }
+
+    function renderDriveFileCard(d, subtitleText) {
+        const ext = String(d.file_ext || 'file').toUpperCase();
+        const extClass = getDriveExtClass(d.file_ext);
+        const displayName = d.original_filename || d.title;
+        return `
+            <div class="drive-item-card" data-drive-file-id="${d.id}">
+                <div class="drive-art-box">
+                    <div class="drive-file-shape ${extClass}">
+                        <div class="drive-file-lines"><span></span><span></span><span></span></div>
+                        <span class="drive-file-ext-label">${escapeHtml(ext)}</span>
+                    </div>
+                </div>
+                <div class="drive-card-footer">
+                    <div class="drive-card-meta">
+                        <div class="drive-card-title" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</div>
+                        <div class="drive-card-sub">${escapeHtml(subtitleText)}</div>
+                    </div>
+                    <button type="button" class="drive-menu-btn" data-drive-file-menu="${d.id}" title="File options">&#8942;</button>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderDriveStorage(storage) {
+        if (!storage) return;
+        const used = Number(storage.used_bytes || 0);
+        const quota = Math.max(1, Number(storage.quota_bytes || 1073741824));
+        const usedPct = Math.min(100, Math.round((used / quota) * 100));
+
+        const segments = [
+            { label: 'Documents', bytes: Number(storage.docs_bytes || 0), color: '#a78bfa' },
+            { label: 'PDF Files', bytes: Number(storage.pdf_bytes || 0), color: '#7dd3c8' },
+            { label: 'Sheets & Slides', bytes: Number(storage.sheets_bytes || 0), color: '#c4b5fd' },
+            { label: 'Images & Other', bytes: Number(storage.other_bytes || 0), color: '#60a5fa' },
+        ];
+        const availBytes = Math.max(0, quota - used);
+
+        $('#drive-storage-summary').textContent = `${formatBytes(used)} of ${formatBytes(quota)} used`;
+        $('#drive-storage-bar').innerHTML = [
+            ...segments.map((s) => {
+                const w = Math.max(s.bytes > 0 ? 1.5 : 0, (s.bytes / quota) * 100);
+                return `<div class="drive-bar-seg" style="width:${w.toFixed(2)}%;background:${s.color}" title="${escapeHtml(s.label)}: ${formatBytes(s.bytes)}"></div>`;
+            }),
+            `<div class="drive-bar-seg" style="flex:1;background:#cbd5e1" title="Available: ${formatBytes(availBytes)}"></div>`,
+        ].join('');
+
+        $('#drive-storage-legend').innerHTML = `
+            <div class="drive-legend-items">
+                ${segments.map((s) => {
+                    const p = used > 0 ? Math.round((s.bytes / quota) * 100) : 0;
+                    return `<span class="drive-legend-item"><i class="drive-legend-dot" style="background:${s.color}"></i>${escapeHtml(s.label)} <strong>${p}%</strong></span>`;
+                }).join('')}
+                <span class="drive-legend-item"><i class="drive-legend-dot" style="background:#cbd5e1"></i>Available <strong>${Math.max(0, 100 - usedPct)}%</strong></span>
+            </div>
+            <span><strong>${usedPct}%</strong> Storage Used</span>
+        `;
+    }
+
+    function renderDriveFolders(folders) {
+        const grid = $('#drive-folders-grid');
+        const bc = $('#drive-folder-breadcrumb');
+        if (state.driveFolderId > 0) {
+            bc?.classList.remove('hidden');
+            $('#drive-active-folder-name').textContent = state.driveFolderName || 'Folder';
+        } else {
+            bc?.classList.add('hidden');
+        }
+
+        if (!folders || !folders.length) {
+            grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1">No folders yet. Click <strong>+ New Folder</strong> to organize your documents.</div>';
+            return;
+        }
+
+        grid.innerHTML = folders.map((f) => `
+            <div class="drive-item-card ${Number(state.driveFolderId) === Number(f.id) ? 'active-folder' : ''}" data-drive-folder-id="${f.id}" data-drive-folder-name="${escapeHtml(f.name)}">
+                <div class="drive-art-box">${renderDriveFolderSvg(Number(f.file_count) > 1)}</div>
+                <div class="drive-card-footer">
+                    <div class="drive-card-meta">
+                        <div class="drive-card-title" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>
+                        <div class="drive-card-sub">${Number(f.file_count)} file(s) &bull; ${escapeHtml(timeAgoShort(f.updated_at))}</div>
+                    </div>
+                    <button type="button" class="drive-menu-btn" data-drive-folder-menu="${f.id}" data-folder-name="${escapeHtml(f.name)}" title="Folder options">&#8942;</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function renderDriveRecent(recentFiles) {
+        const wrap = $('#drive-recent-wrap');
+        const q = ($('#drive-recent-search')?.value || '').trim().toLowerCase();
+        const filtered = (recentFiles || []).filter((d) =>
+            !q || `${d.original_filename} ${d.title} ${d.doc_code}`.toLowerCase().includes(q)
+        );
+
+        if (!filtered.length) {
+            wrap.className = '';
+            wrap.innerHTML = '<div class="empty-state">No recently opened files match your filter.</div>';
+            return;
+        }
+
+        if (state.driveRecentMode === 'list') {
+            wrap.className = 'table-wrap card';
+            wrap.innerHTML = `
+                <table class="responsive-table">
+                    <thead><tr><th>File</th><th>Code</th><th>Size</th><th>Last Opened</th><th>Actions</th></tr></thead>
+                    <tbody>
+                        ${filtered.map((d) => `
+                            <tr>
+                                <td data-label="File"><strong>${escapeHtml(d.original_filename || d.title)}</strong></td>
+                                <td data-label="Code"><span class="doc-code">${escapeHtml(d.doc_code)}</span></td>
+                                <td data-label="Size">${formatBytes(d.file_size)}</td>
+                                <td data-label="Last Opened">${escapeHtml(timeAgoShort(d.last_opened_at))}</td>
+                                <td class="td-actions">
+                                    <div class="actions-cell">
+                                        <button type="button" class="btn btn-outline btn-xs" data-open-doc="${d.id}">View</button>
+                                        <a href="api/file.php?id=${d.id}&mode=download" class="btn btn-primary btn-xs">Download</a>
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            return;
+        }
+
+        wrap.className = 'drive-cards-grid';
+        wrap.innerHTML = filtered.map((d) => renderDriveFileCard(d, `Opened ${timeAgoShort(d.last_opened_at)}`)).join('');
+    }
+
+    function renderDriveAllFiles(files) {
+        const wrap = $('#drive-all-wrap');
+        const q = ($('#drive-all-search')?.value || '').trim().toLowerCase();
+        const filtered = (files || []).filter((d) =>
+            !q || `${d.original_filename} ${d.title} ${d.doc_code} ${d.sender_name}`.toLowerCase().includes(q)
+        );
+
+        if (!filtered.length) {
+            wrap.className = '';
+            wrap.innerHTML = '<div class="empty-state">No files found in this location.</div>';
+            return;
+        }
+
+        if (state.driveAllMode === 'grid') {
+            wrap.className = 'drive-cards-grid';
+            wrap.innerHTML = filtered.map((d) =>
+                renderDriveFileCard(d, `${formatBytes(d.file_size)}${d.folder_name ? ` • ${d.folder_name}` : ''}`)
+            ).join('');
+            return;
+        }
+
+        wrap.className = 'table-wrap card';
+        wrap.innerHTML = `
+            <table class="responsive-table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>File Name</th>
+                        <th>Folder</th>
+                        <th>Uploaded By</th>
+                        <th>Size</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${filtered.map((d) => `
+                        <tr>
+                            <td data-label="Code"><span class="doc-code">${escapeHtml(d.doc_code)}</span></td>
+                            <td data-label="File Name"><strong>${escapeHtml(d.original_filename || d.title)}</strong><div class="muted">${escapeHtml(d.title)}</div></td>
+                            <td data-label="Folder">${d.folder_name ? `<span class="badge badge-info">${escapeHtml(d.folder_name)}</span>` : '<span class="muted">Root</span>'}</td>
+                            <td data-label="Uploaded By">${escapeHtml(d.sender_name)}</td>
+                            <td data-label="Size">${formatBytes(d.file_size)}</td>
+                            <td data-label="Date">${escapeHtml(formatDate(d.created_at))}</td>
+                            <td class="td-actions">
+                                <div class="actions-cell">
+                                    <button type="button" class="btn btn-outline btn-xs" data-open-doc="${d.id}">View</button>
+                                    <a href="api/file.php?id=${d.id}&mode=download" class="btn btn-primary btn-xs">DL</a>
+                                    <button type="button" class="btn btn-outline btn-xs" data-drive-move-file="${d.id}">Move</button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    async function loadDrive() {
+        const foldersGrid = $('#drive-folders-grid');
+        if (foldersGrid) foldersGrid.innerHTML = '<div class="empty-state" style="grid-column:1/-1">Loading File Drive...</div>';
+        try {
+            const params = new URLSearchParams({
+                action: 'overview',
+                folder_id: String(state.driveFolderId || 0),
+            });
+            const data = await apiFetch(`api/drive.php?${params.toString()}`);
+            state.driveData = data;
+            renderDriveStorage(data.storage);
+            renderDriveFolders(data.folders);
+            renderDriveRecent(data.recent_files);
+            renderDriveAllFiles(data.files);
+        } catch (err) {
+            if (foldersGrid) foldersGrid.innerHTML = `<div class="empty-state" style="grid-column:1/-1">${escapeHtml(err.message)}</div>`;
         }
     }
 
@@ -2723,6 +2999,196 @@
                 pollNotifications();
                 if (state.currentView === 'inbox') loadInbox();
             }, 800);
+        });
+
+        // File Drive interactions (Admin-only now, future-ready for all users)
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.drive-context-menu') && !e.target.closest('.drive-menu-btn')) {
+                closeDriveContextMenu();
+            }
+        });
+
+        $('#drive-new-folder-btn')?.addEventListener('click', async () => {
+            const name = window.prompt('Enter new folder name:');
+            if (!name || !name.trim()) return;
+            try {
+                const data = await apiFetch('api/drive.php?action=create_folder', {
+                    method: 'POST',
+                    json: { name: name.trim() },
+                });
+                toast(data.message, 'success');
+                loadDrive();
+            } catch (err) {
+                toast(err.message, 'error');
+            }
+        });
+
+        $('#drive-upload-btn')?.addEventListener('click', () => {
+            switchView('send');
+        });
+
+        $('#drive-back-root-btn')?.addEventListener('click', () => {
+            state.driveFolderId = 0;
+            state.driveFolderName = '';
+            loadDrive();
+        });
+
+        $('#drive-recent-search')?.addEventListener('input', () => {
+            if (state.driveData) renderDriveRecent(state.driveData.recent_files);
+        });
+
+        $('#drive-all-search')?.addEventListener('input', () => {
+            if (state.driveData) renderDriveAllFiles(state.driveData.files);
+        });
+
+        $$('.drive-view-toggle').forEach((group) => {
+            group.addEventListener('click', (e) => {
+                const btn = e.target.closest('.drive-toggle-btn');
+                if (!btn) return;
+                const mode = btn.dataset.mode;
+                const target = group.dataset.target;
+                group.querySelectorAll('.drive-toggle-btn').forEach((b) => b.classList.toggle('active', b === btn));
+                if (target === 'recent') {
+                    state.driveRecentMode = mode;
+                    if (state.driveData) renderDriveRecent(state.driveData.recent_files);
+                } else {
+                    state.driveAllMode = mode;
+                    if (state.driveData) renderDriveAllFiles(state.driveData.files);
+                }
+            });
+        });
+
+        async function openDriveMovePrompt(docId) {
+            const folders = state.driveData?.folders || [];
+            const optionsText = folders.map((f) => `${f.id}: ${f.name}`).join('\n');
+            const input = window.prompt(
+                `Move file to folder ID (enter 0 for Root):\n\n${optionsText || '(No folders created yet)'}`,
+                '0'
+            );
+            if (input === null) return;
+            const folderId = Number(input.trim()) || 0;
+            try {
+                const data = await apiFetch('api/drive.php?action=move_file', {
+                    method: 'POST',
+                    json: { document_id: docId, folder_id: folderId },
+                });
+                toast(data.message, 'success');
+                loadDrive();
+            } catch (err) {
+                toast(err.message, 'error');
+            }
+        }
+
+        $('#view-admin-drive')?.addEventListener('click', async (e) => {
+            const folderMenuBtn = e.target.closest('[data-drive-folder-menu]');
+            if (folderMenuBtn) {
+                e.stopPropagation();
+                closeDriveContextMenu();
+                const folderId = Number(folderMenuBtn.dataset.driveFolderMenu);
+                const folderName = folderMenuBtn.dataset.folderName || 'Folder';
+                const rect = folderMenuBtn.getBoundingClientRect();
+                const menu = document.createElement('div');
+                menu.className = 'drive-context-menu';
+                menu.style.top = `${Math.min(window.innerHeight - 130, rect.bottom + 4)}px`;
+                menu.style.left = `${Math.min(window.innerWidth - 180, rect.left - 120)}px`;
+                menu.innerHTML = `
+                    <button type="button" data-act="open">Open Folder</button>
+                    <button type="button" data-act="rename">Rename</button>
+                    <button type="button" class="danger" data-act="delete">Delete Folder</button>
+                `;
+                menu.addEventListener('click', async (me) => {
+                    const act = me.target.closest('button')?.dataset.act;
+                    closeDriveContextMenu();
+                    if (act === 'open') {
+                        state.driveFolderId = folderId;
+                        state.driveFolderName = folderName;
+                        loadDrive();
+                    } else if (act === 'rename') {
+                        const newName = window.prompt('Rename folder:', folderName);
+                        if (!newName || !newName.trim()) return;
+                        try {
+                            const data = await apiFetch('api/drive.php?action=rename_folder', {
+                                method: 'POST',
+                                json: { folder_id: folderId, name: newName.trim() },
+                            });
+                            toast(data.message, 'success');
+                            if (state.driveFolderId === folderId) state.driveFolderName = newName.trim();
+                            loadDrive();
+                        } catch (err) {
+                            toast(err.message, 'error');
+                        }
+                    } else if (act === 'delete') {
+                        if (!window.confirm(`Delete folder "${folderName}"? Files inside will be moved back to Root.`)) return;
+                        try {
+                            const data = await apiFetch('api/drive.php?action=delete_folder', {
+                                method: 'POST',
+                                json: { folder_id: folderId },
+                            });
+                            toast(data.message, 'success');
+                            if (state.driveFolderId === folderId) {
+                                state.driveFolderId = 0;
+                                state.driveFolderName = '';
+                            }
+                            loadDrive();
+                        } catch (err) {
+                            toast(err.message, 'error');
+                        }
+                    }
+                });
+                document.body.appendChild(menu);
+                return;
+            }
+
+            const fileMenuBtn = e.target.closest('[data-drive-file-menu]');
+            if (fileMenuBtn) {
+                e.stopPropagation();
+                closeDriveContextMenu();
+                const docId = Number(fileMenuBtn.dataset.driveFileMenu);
+                const rect = fileMenuBtn.getBoundingClientRect();
+                const menu = document.createElement('div');
+                menu.className = 'drive-context-menu';
+                menu.style.top = `${Math.min(window.innerHeight - 130, rect.bottom + 4)}px`;
+                menu.style.left = `${Math.min(window.innerWidth - 180, rect.left - 120)}px`;
+                menu.innerHTML = `
+                    <button type="button" data-act="preview">View / Preview</button>
+                    <button type="button" data-act="download">Download</button>
+                    <button type="button" data-act="move">Move to Folder...</button>
+                `;
+                menu.addEventListener('click', (me) => {
+                    const act = me.target.closest('button')?.dataset.act;
+                    closeDriveContextMenu();
+                    if (act === 'preview') openDocumentModal(docId);
+                    if (act === 'download') downloadFileWithProgress(`api/file.php?id=${docId}&mode=download`);
+                    if (act === 'move') openDriveMovePrompt(docId);
+                });
+                document.body.appendChild(menu);
+                return;
+            }
+
+            const moveBtn = e.target.closest('[data-drive-move-file]');
+            if (moveBtn) {
+                openDriveMovePrompt(Number(moveBtn.dataset.driveMoveFile));
+                return;
+            }
+
+            const folderCard = e.target.closest('[data-drive-folder-id]');
+            if (folderCard) {
+                const fid = Number(folderCard.dataset.driveFolderId);
+                if (state.driveFolderId === fid) {
+                    state.driveFolderId = 0;
+                    state.driveFolderName = '';
+                } else {
+                    state.driveFolderId = fid;
+                    state.driveFolderName = folderCard.dataset.driveFolderName || 'Folder';
+                }
+                loadDrive();
+                return;
+            }
+
+            const fileCard = e.target.closest('[data-drive-file-id]');
+            if (fileCard) {
+                openDocumentModal(Number(fileCard.dataset.driveFileId));
+            }
         });
 
         // Admin document actions
