@@ -3159,6 +3159,26 @@
             return 'inline';
         }
 
+        function getWordObjWidthPct(el) {
+            if (!el) return 100;
+            const w = el.style.width || '';
+            if (w.endsWith('%')) return Math.max(15, Math.min(100, parseInt(w, 10) || 100));
+            const paper = $('#gdoc-editor-paper');
+            if (paper && paper.clientWidth > 0 && el.offsetWidth > 0) {
+                return Math.max(15, Math.min(100, Math.round((el.offsetWidth / paper.clientWidth) * 100)));
+            }
+            return 100;
+        }
+
+        function setWordObjWidthPct(pct) {
+            if (!selectedWordObj) return;
+            const clamped = Math.max(15, Math.min(100, Math.round(pct)));
+            selectedWordObj.style.width = `${clamped}%`;
+            selectedWordObj.style.maxWidth = `${clamped}%`;
+            const lbl = $('#word-obj-size-val');
+            if (lbl) lbl.textContent = `${clamped}%`;
+        }
+
         function applyWordObjWrap(mode) {
             if (!selectedWordObj) {
                 toast('Click an inserted image, shape, or table first.', 'info');
@@ -3167,7 +3187,10 @@
             selectedWordObj.classList.remove('wrap-inline', 'wrap-left', 'wrap-right', 'wrap-top-bottom');
             selectedWordObj.classList.add(`wrap-${mode}`);
             if ((mode === 'left' || mode === 'right') && !selectedWordObj.style.width) {
-                selectedWordObj.style.width = '45%';
+                setWordObjWidthPct(45);
+            } else {
+                const lbl = $('#word-obj-size-val');
+                if (lbl) lbl.textContent = `${getWordObjWidthPct(selectedWordObj)}%`;
             }
             $$('#word-wrap-bar [data-wrap-mode]').forEach((b) => {
                 b.classList.toggle('active', b.dataset.wrapMode === mode);
@@ -3191,6 +3214,8 @@
             });
             const sel = $('#word-wrap-select');
             if (sel) sel.value = mode;
+            const lbl = $('#word-obj-size-val');
+            if (lbl) lbl.textContent = `${getWordObjWidthPct(selectedWordObj)}%`;
             $('#word-wrap-bar')?.classList.remove('hidden');
         });
 
@@ -3200,10 +3225,12 @@
                 applyWordObjWrap(wrapBtn.dataset.wrapMode);
                 return;
             }
-            const widthBtn = e.target.closest('[data-obj-width]');
-            if (widthBtn && selectedWordObj) {
-                selectedWordObj.style.width = widthBtn.dataset.objWidth;
-                selectedWordObj.style.maxWidth = widthBtn.dataset.objWidth;
+            if (e.target.closest('#word-obj-size-dec') && selectedWordObj) {
+                setWordObjWidthPct(getWordObjWidthPct(selectedWordObj) - 5);
+                return;
+            }
+            if (e.target.closest('#word-obj-size-inc') && selectedWordObj) {
+                setWordObjWidthPct(getWordObjWidthPct(selectedWordObj) + 5);
                 return;
             }
             if (e.target.closest('#word-obj-delete') && selectedWordObj) {

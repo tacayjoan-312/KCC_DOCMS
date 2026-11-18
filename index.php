@@ -1356,9 +1356,11 @@ $csrfToken = getCsrfToken();
                         <button type="button" class="gdoc-tool-btn" data-wrap-mode="right">Wrap Right</button>
                         <button type="button" class="gdoc-tool-btn" data-wrap-mode="top-bottom">Top &amp; Bottom</button>
                         <span class="gdoc-tool-sep"></span>
-                        <button type="button" class="gdoc-tool-btn" data-obj-width="35%">S</button>
-                        <button type="button" class="gdoc-tool-btn" data-obj-width="55%">M</button>
-                        <button type="button" class="gdoc-tool-btn" data-obj-width="100%">L</button>
+                        <div class="gdoc-size-ctrl" title="Resize selected object">
+                            <button type="button" class="gdoc-tool-btn" id="word-obj-size-dec" title="Decrease width (-5%)">-</button>
+                            <span id="word-obj-size-val" class="gdoc-size-val">100%</span>
+                            <button type="button" class="gdoc-tool-btn" id="word-obj-size-inc" title="Increase width (+5%)">+</button>
+                        </div>
                         <button type="button" class="gdoc-tool-btn" id="word-obj-delete" title="Remove selected object" style="color:#dc2626">&times;</button>
                     </div>
                     <div class="gdoc-paper-stage" id="gdoc-paper-stage">
