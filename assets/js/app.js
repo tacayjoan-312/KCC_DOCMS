@@ -122,6 +122,236 @@
         return data;
     }
 
+    // ---- Neumorphic Process Progress Helpers (Sending, Viewing, Processing, Downloading) ----
+    const NEU_RING_CIRCUMFERENCE = 2 * Math.PI * 56; // r = 56 -> 351.858
+
+    function showProcessModal({
+        title = 'Processing...',
+        subtitle = 'Please wait while we complete your request',
+        ringLabel = 'LOADING...',
+        steps = [],
+        indeterminate = false,
+    } = {}) {
+        const modal = $('#upload-progress-modal');
+        if (!modal) return;
+
+        $('#upload-progress-title').textContent = title;
+        $('#upload-progress-sub').textContent = subtitle;
+        $('#process-ring-label').textContent = ringLabel;
+
+        const ringWrap = $('#process-ring-wrap');
+        if (ringWrap) {
+            ringWrap.classList.toggle('indeterminate', Boolean(indeterminate));
+        }
+
+        const list = $('#process-steps-list');
+        if (list && Array.isArray(steps) && steps.length) {
+            list.innerHTML = steps.map((text, idx) => `
+                <li class="upload-step ${idx === 0 ? 'active' : 'pending'}">
+                    <span class="step-badge">${idx + 1}</span>
+                    <span class="step-text">${escapeHtml(text)}</span>
+                </li>
+            `).join('');
+            list.classList.remove('hidden');
+        } else if (list) {
+            list.innerHTML = '';
+            list.classList.add('hidden');
+        }
+
+        updateProcessModal(0, 'Starting...', 0, ringLabel);
+        modal.classList.remove('hidden');
+    }
+
+    function updateProcessModal(pct, statusText, stepIndex, ringLabel) {
+        const clamped = Math.max(0, Math.min(100, Number(pct) || 0));
+        const arc = $('#process-ring-arc');
+        if (arc) {
+            arc.style.strokeDasharray = `${NEU_RING_CIRCUMFERENCE.toFixed(2)}`;
+            arc.style.strokeDashoffset = `${(NEU_RING_CIRCUMFERENCE * (1 - clamped / 100)).toFixed(2)}`;
+        }
+        const ringPct = $('#process-ring-pct');
+        if (ringPct) ringPct.textContent = `${Math.round(clamped)}%`;
+        if (ringLabel) {
+            const lbl = $('#process-ring-label');
+            if (lbl) lbl.textContent = ringLabel;
+        }
+
+        const fill = $('#upload-progress-fill');
+        const pctLabel = $('#upload-progress-percent');
+        const bytesLabel = $('#upload-progress-bytes');
+        if (fill) fill.style.width = `${clamped}%`;
+        if (pctLabel) pctLabel.textContent = `${Math.round(clamped)}%`;
+        if (bytesLabel && statusText) bytesLabel.textContent = statusText;
+
+        const steps = $$('#process-steps-list .upload-step');
+        steps.forEach((el, idx) => {
+            const badge = el.querySelector('.step-badge');
+            if (idx < stepIndex) {
+                el.className = 'upload-step done';
+                if (badge) badge.textContent = '✓';
+            } else if (idx === stepIndex) {
+                el.className = 'upload-step active';
+                if (badge) badge.textContent = `${idx + 1}`;
+            } else {
+                el.className = 'upload-step pending';
+                if (badge) badge.textContent = `${idx + 1}`;
+            }
+        });
+    }
+
+    function hideProcessModal() {
+        const modal = $('#upload-progress-modal');
+        if (modal) modal.classList.add('hidden');
+        $('#process-ring-wrap')?.classList.remove('indeterminate');
+    }
+
+    function renderInlinePreviewRing(ringLabel, title, subtitle, pct = 65, indeterminate = true) {
+        const clamped = Math.max(0, Math.min(100, Number(pct) || 0));
+        const dashOffset = (NEU_RING_CIRCUMFERENCE * (1 - clamped / 100)).toFixed(2);
+        return `
+            <div class="neu-preview-loader">
+                <div class="neu-progress-ring compact ${indeterminate ? 'indeterminate' : ''}">
+                    <svg class="neu-progress-svg" viewBox="0 0 140 140" aria-hidden="true">
+                        <defs>
+                            <linearGradient id="neuInlineGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#38bdf8"/>
+                                <stop offset="50%" stop-color="#0ea5e9"/>
+                                <stop offset="100%" stop-color="#2563eb"/>
+                            </linearGradient>
+                        </defs>
+                        <circle class="neu-progress-track-arc" cx="70" cy="70" r="56"/>
+                        <circle class="neu-progress-fill-arc" cx="70" cy="70" r="56"
+                                style="stroke: url(#neuInlineGrad)"
+                                stroke-dasharray="${NEU_RING_CIRCUMFERENCE.toFixed(2)}"
+                                stroke-dashoffset="${dashOffset}"/>
+                    </svg>
+                    <div class="neu-progress-inner">
+                        <span class="neu-progress-pct">${indeterminate ? '' : `${Math.round(clamped)}%`}</span>
+                        <span class="neu-progress-label">${escapeHtml(ringLabel)}</span>
+                    </div>
+                </div>
+                <h4>${escapeHtml(title)}</h4>
+                <p>${escapeHtml(subtitle)}</p>
+            </div>
+        `;
+    }
+
+    function apiUploadWithProgress(url, formData, onProgress) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url, true);
+            xhr.withCredentials = true;
+            xhr.setRequestHeader('X-CSRF-Token', state.csrfToken);
+
+            xhr.upload.addEventListener('progress', (ev) => {
+                if (typeof onProgress === 'function' && ev.lengthComputable) {
+                    onProgress(ev.loaded, ev.total);
+                }
+            });
+
+            xhr.addEventListener('load', () => {
+                let data = {};
+                try {
+                    data = JSON.parse(xhr.responseText || '{}');
+                } catch {
+                    data = { success: false, error: 'Invalid server response.' };
+                }
+                if (xhr.status < 200 || xhr.status >= 300 || data.success === false) {
+                    if (xhr.status === 401 && state.user) showAuthScreen();
+                    reject(new Error(data.error || `Request failed (${xhr.status})`));
+                    return;
+                }
+                resolve(data);
+            });
+
+            xhr.addEventListener('error', () => reject(new Error('Network error while uploading.')));
+            xhr.addEventListener('abort', () => reject(new Error('Upload cancelled.')));
+            xhr.send(formData);
+        });
+    }
+
+    async function downloadFileWithProgress(url, fallbackFilename = 'document') {
+        showProcessModal({
+            title: 'Downloading Document...',
+            subtitle: 'Fetching file securely from server',
+            ringLabel: 'DOWNLOADING',
+            steps: [
+                'Requesting authorized file stream',
+                'Downloading file data',
+                'Saving file to your device',
+            ],
+        });
+        updateProcessModal(10, 'Connecting to server...', 0, 'DOWNLOADING');
+
+        try {
+            const res = await fetch(url, { credentials: 'same-origin' });
+            if (!res.ok) {
+                let errMsg = `Download failed (${res.status})`;
+                try {
+                    const errJson = await res.json();
+                    if (errJson?.error) errMsg = errJson.error;
+                } catch { /* ignore */ }
+                throw new Error(errMsg);
+            }
+
+            const disp = res.headers.get('Content-Disposition') || '';
+            let filename = fallbackFilename;
+            const utfMatch = disp.match(/filename\*=UTF-8''([^;]+)/i);
+            const asciiMatch = disp.match(/filename="([^"]+)"/i);
+            if (utfMatch && utfMatch[1]) {
+                filename = decodeURIComponent(utfMatch[1]);
+            } else if (asciiMatch && asciiMatch[1]) {
+                filename = asciiMatch[1];
+            }
+
+            const total = Number(res.headers.get('Content-Length') || 0);
+            updateProcessModal(20, total ? `0 B / ${formatBytes(total)}` : 'Downloading...', 1, 'DOWNLOADING');
+
+            let blob;
+            if (res.body && typeof res.body.getReader === 'function') {
+                const reader = res.body.getReader();
+                const chunks = [];
+                let received = 0;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    received += value.byteLength;
+                    if (total > 0) {
+                        const pct = Math.min(92, 20 + Math.round((received / total) * 72));
+                        updateProcessModal(pct, `${formatBytes(received)} / ${formatBytes(total)}`, 1, 'DOWNLOADING');
+                    } else {
+                        updateProcessModal(60, `Downloaded ${formatBytes(received)}...`, 1, 'DOWNLOADING');
+                    }
+                }
+                blob = new Blob(chunks, { type: res.headers.get('Content-Type') || 'application/octet-stream' });
+            } else {
+                blob = await res.blob();
+            }
+
+            updateProcessModal(96, 'Saving to device...', 2, 'SAVING');
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 2500);
+
+            updateProcessModal(100, 'Download complete!', 3, 'DONE');
+            setTimeout(() => {
+                hideProcessModal();
+                pollNotifications();
+                if (state.currentView === 'inbox') loadInbox();
+            }, 450);
+        } catch (err) {
+            hideProcessModal();
+            toast(err.message || 'Download failed.', 'error');
+        }
+    }
+
     // ---- PWA & Mobile Helpers ----
     function initPwaSupport() {
         if ('serviceWorker' in navigator) {
@@ -1493,11 +1723,41 @@
         });
 
         if (ext === 'pdf') {
-            previewPane.innerHTML = `<iframe src="${viewUrl}" title="${escapeHtml(file.original_filename)}"></iframe>`;
+            previewPane.innerHTML = renderInlinePreviewRing('LOADING...', 'Loading PDF Preview...', file.original_filename || 'Document', 65, true);
+            const iframe = document.createElement('iframe');
+            iframe.src = viewUrl;
+            iframe.title = file.original_filename || 'Document Preview';
+            iframe.style.display = 'none';
+            iframe.addEventListener('load', () => {
+                if (state.currentModalDoc?.id !== doc.id || state.currentModalFileId !== activeId) return;
+                previewPane.querySelector('.neu-preview-loader')?.remove();
+                iframe.style.display = '';
+            });
+            previewPane.appendChild(iframe);
         } else if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
-            previewPane.innerHTML = `<img src="${viewUrl}" alt="${escapeHtml(file.original_filename)}">`;
+            previewPane.innerHTML = renderInlinePreviewRing('LOADING...', 'Loading Image Preview...', file.original_filename || 'Image', 65, true);
+            const img = document.createElement('img');
+            img.src = viewUrl;
+            img.alt = file.original_filename || 'Image Preview';
+            img.style.display = 'none';
+            img.addEventListener('load', () => {
+                if (state.currentModalDoc?.id !== doc.id || state.currentModalFileId !== activeId) return;
+                previewPane.querySelector('.neu-preview-loader')?.remove();
+                img.style.display = '';
+            });
+            img.addEventListener('error', () => {
+                if (state.currentModalDoc?.id !== doc.id || state.currentModalFileId !== activeId) return;
+                previewPane.innerHTML = `
+                    <div class="preview-fallback">
+                        <h4>Unable to render image preview</h4>
+                        <p>The file may be missing or unreadable. Try downloading it.</p>
+                        <a href="${downloadUrl}" class="btn btn-primary">Download File</a>
+                    </div>
+                `;
+            });
+            previewPane.appendChild(img);
         } else if (ext === 'txt') {
-            previewPane.innerHTML = '<div class="preview-fallback">Loading preview...</div>';
+            previewPane.innerHTML = renderInlinePreviewRing('LOADING...', 'Loading Text Preview...', file.original_filename || 'Text File', 60, true);
             const res = await fetch(viewUrl, { credentials: 'same-origin' });
             const text = await res.text();
             if (state.currentModalDoc?.id !== doc.id || state.currentModalFileId !== activeId) return;
@@ -1506,7 +1766,7 @@
             previewPane.innerHTML = '';
             previewPane.appendChild(pre);
         } else if (['docx', 'xlsx', 'pptx', 'csv', 'zip', 'doc', 'xls', 'ppt'].includes(ext)) {
-            previewPane.innerHTML = '<div class="preview-fallback">Generating document preview...</div>';
+            previewPane.innerHTML = renderInlinePreviewRing('PREVIEWING...', 'Generating Document Preview...', `Rendering .${ext.toUpperCase()} structure`, 68, true);
             try {
                 const data = await apiFetch(buildPreviewUrl(doc.id, activeId));
                 if (state.currentModalDoc?.id !== doc.id || state.currentModalFileId !== activeId) return;
@@ -1541,7 +1801,7 @@
         setDocModalMobileTab('preview');
         attachBar?.classList.add('hidden');
         if (attachBar) attachBar.innerHTML = '';
-        previewPane.innerHTML = '<div class="preview-fallback">Loading preview...</div>';
+        previewPane.innerHTML = renderInlinePreviewRing('LOADING...', 'Opening Document...', 'Fetching metadata & receipts', 45, true);
         metaPane.innerHTML = '<div class="muted">Loading document details...</div>';
         modal.classList.remove('hidden');
 
@@ -2088,6 +2348,18 @@
                 ? 'Updating Attachments...'
                 : 'Saving Changes...';
 
+            showProcessModal({
+                title: 'Processing Document Update...',
+                subtitle: 'Saving metadata and updating attachments',
+                ringLabel: 'PROCESSING',
+                steps: [
+                    'Validating document changes',
+                    'Uploading updated attachments',
+                    'Updating database & recipient receipts',
+                ],
+            });
+            updateProcessModal(15, 'Validating changes...', 0, 'PROCESSING');
+
             try {
                 const fd = new FormData();
                 fd.append('document_id', String(docId));
@@ -2099,10 +2371,15 @@
                 state.editRemoveFileIds.forEach((id) => fd.append('remove_file_ids[]', String(id)));
                 state.editSelectedRecipientIds.forEach((id) => fd.append('recipients[]', id));
 
-                const data = await apiFetch('api/documents.php?action=update', {
-                    method: 'POST',
-                    body: fd,
+                const data = await apiUploadWithProgress('api/documents.php?action=update', fd, (loaded, total) => {
+                    const pct = Math.min(78, 18 + Math.round((loaded / total) * 60));
+                    updateProcessModal(pct, `Uploading ${formatBytes(loaded)} / ${formatBytes(total)}...`, 1, 'PROCESSING');
                 });
+                updateProcessModal(92, 'Updating database & receipts...', 2, 'PROCESSING');
+                await new Promise((r) => setTimeout(r, 250));
+                updateProcessModal(100, 'Complete!', 3, 'DONE');
+                setTimeout(() => hideProcessModal(), 350);
+
                 toast(data.message, 'success');
                 $('#edit-doc-modal').classList.add('hidden');
                 if (state.currentView === 'sent') loadSent();
@@ -2110,6 +2387,7 @@
                 if (state.currentView === 'dashboard') loadDashboard();
                 pollNotifications();
             } catch (err) {
+                hideProcessModal();
                 toast(err.message, 'error');
             } finally {
                 btn.disabled = false;
@@ -2334,31 +2612,6 @@
             updateSelectedRecipientCount();
         });
 
-        function updateUploadProgress(pct, statusText, stepIndex) {
-            const fill = $('#upload-progress-fill');
-            const pctLabel = $('#upload-progress-percent');
-            const bytesLabel = $('#upload-progress-bytes');
-            if (fill) fill.style.width = `${pct}%`;
-            if (pctLabel) pctLabel.textContent = `${pct}%`;
-            if (bytesLabel && statusText) bytesLabel.textContent = statusText;
-
-            const steps = [$('#step-pack'), $('#step-storage'), $('#step-db'), $('#step-email')];
-            steps.forEach((el, idx) => {
-                if (!el) return;
-                const badge = el.querySelector('.step-badge');
-                if (idx < stepIndex) {
-                    el.className = 'upload-step done';
-                    if (badge) badge.textContent = '✓';
-                } else if (idx === stepIndex) {
-                    el.className = 'upload-step active';
-                    if (badge) badge.textContent = `${idx + 1}`;
-                } else {
-                    el.className = 'upload-step pending';
-                    if (badge) badge.textContent = `${idx + 1}`;
-                }
-            });
-        }
-
         $('#upload-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!state.selectedFiles.length) {
@@ -2375,9 +2628,18 @@
             btn.disabled = true;
             btn.textContent = `Uploading ${state.selectedFiles.length} file(s)...`;
 
-            const progressModal = $('#upload-progress-modal');
-            progressModal?.classList.remove('hidden');
-            updateUploadProgress(15, `Packaging ${state.selectedFiles.length} file(s)...`, 0);
+            showProcessModal({
+                title: 'Uploading & Sending Document...',
+                subtitle: 'Encrypting documents and notifying recipients',
+                ringLabel: 'SENDING',
+                steps: [
+                    'Packaging and encrypting attached files',
+                    'Uploading to secure cloud storage',
+                    'Generating Document Code & database backup',
+                    'Dispatching real-time notifications',
+                ],
+            });
+            updateProcessModal(10, `Packaging ${state.selectedFiles.length} file(s)...`, 0, 'SENDING');
 
             try {
                 const fd = new FormData();
@@ -2388,25 +2650,16 @@
                 state.selectedFiles.forEach((f) => fd.append('files[]', f));
                 selectedRecs.forEach((id) => fd.append('recipients[]', id));
 
-                // Step 2: Storage upload animation step
-                await new Promise((r) => setTimeout(r, 350));
-                updateUploadProgress(45, 'Encrypting & uploading to cloud storage...', 1);
-
-                const dataPromise = apiFetch('api/documents.php?action=upload', {
-                    method: 'POST',
-                    body: fd,
+                const data = await apiUploadWithProgress('api/documents.php?action=upload', fd, (loaded, total) => {
+                    const pct = Math.min(78, 12 + Math.round((loaded / total) * 66));
+                    updateProcessModal(pct, `Uploading ${formatBytes(loaded)} / ${formatBytes(total)}...`, 1, 'SENDING');
                 });
 
-                // Step 3: Progressive step while request finishes
-                await new Promise((r) => setTimeout(r, 400));
-                updateUploadProgress(70, 'Generating unique Document Code & receipts...', 2);
-
-                const data = await dataPromise;
-
-                // Step 4: Dispatch notifications & finish
-                updateUploadProgress(95, 'Dispatching real-time notifications...', 3);
-                await new Promise((r) => setTimeout(r, 300));
-                updateUploadProgress(100, 'Complete!', 4);
+                updateProcessModal(86, 'Generating Document Code & database backup...', 2, 'PROCESSING');
+                await new Promise((r) => setTimeout(r, 250));
+                updateProcessModal(95, 'Dispatching real-time notifications...', 3, 'SENDING');
+                await new Promise((r) => setTimeout(r, 250));
+                updateProcessModal(100, 'Complete!', 4, 'DONE');
 
                 let msg = `${data.doc_code} (${data.file_count || 1} file(s)) sent to ${data.recipient_count} recipient(s)!`;
                 if (data.email_summary && data.email_summary.enabled) {
@@ -2415,19 +2668,30 @@
                 toast(msg, data.email_summary?.failed > 0 ? 'info' : 'success');
 
                 setTimeout(() => {
-                    progressModal?.classList.add('hidden');
+                    hideProcessModal();
                     $('#upload-form').reset();
                     clearSelectedFiles();
                     $$('input[name="recipient_id"]').forEach((cb) => { cb.checked = false; });
                     updateSelectedRecipientCount();
                     switchView('sent');
-                }, 600);
+                }, 550);
             } catch (err) {
-                progressModal?.classList.add('hidden');
+                hideProcessModal();
                 toast(err.message, 'error');
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Send Document Now';
+            }
+        });
+
+        // Global Download Progress Interceptor (Inbox, Sent, All Documents, Document Modal)
+        document.addEventListener('click', (e) => {
+            const dlLink = e.target.closest('a[href*="api/file.php"][href*="mode=download"]');
+            if (!dlLink) return;
+            e.preventDefault();
+            const href = dlLink.getAttribute('href');
+            if (href) {
+                downloadFileWithProgress(href);
             }
         });
 

@@ -2711,3 +2711,146 @@ body {
         box-shadow: var(--neu-raised-sm);
     }
 }
+
+/* ==========================================================================
+   NEUMORPHIC CIRCULAR PROGRESS RING & PROCESS INDICATORS
+   ========================================================================== */
+.neu-process-card {
+    background: #e8edf4 !important;
+    border: 1px solid rgba(255, 255, 255, 0.85) !important;
+    box-shadow: 18px 18px 36px #b8c5d6, -18px -18px 36px #ffffff !important;
+}
+
+.neu-progress-ring {
+    position: relative;
+    width: 140px;
+    height: 140px;
+    margin: 0 auto 16px;
+    border-radius: 999px;
+    background: #e8edf4;
+    box-shadow:
+        10px 10px 22px #c5d0e0,
+        -10px -10px 22px #ffffff,
+        inset 4px 4px 8px #c5d0e0,
+        inset -4px -4px 8px #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.neu-progress-ring.compact {
+    width: 112px;
+    height: 112px;
+    margin-bottom: 14px;
+}
+
+.neu-progress-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.neu-progress-track-arc {
+    fill: none;
+    stroke: rgba(197, 208, 224, 0.45);
+    stroke-width: 11;
+}
+
+.neu-progress-fill-arc {
+    fill: none;
+    stroke: url(#neuProgressGrad);
+    stroke-width: 11;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.neu-progress-ring.indeterminate .neu-progress-svg {
+    animation: neuRingSpin 1.35s linear infinite;
+}
+
+@keyframes neuRingSpin {
+    0% { transform: rotate(-90deg); }
+    100% { transform: rotate(270deg); }
+}
+
+.neu-progress-inner {
+    position: relative;
+    z-index: 2;
+    width: 94px;
+    height: 94px;
+    border-radius: 999px;
+    background: #e8edf4;
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 6px 6px 14px #c5d0e0, -6px -6px 14px #ffffff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+}
+
+.neu-progress-ring.compact .neu-progress-inner {
+    width: 74px;
+    height: 74px;
+}
+
+.neu-progress-pct {
+    font-size: 20px;
+    font-weight: 800;
+    color: #1d4ed8;
+    line-height: 1.1;
+}
+
+.neu-progress-ring.compact .neu-progress-pct {
+    font-size: 16px;
+}
+
+.neu-progress-label {
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: #38bdf8;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+.upload-progress-track {
+    background: #e8edf4;
+    box-shadow: var(--neu-inset);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+}
+
+.upload-progress-fill {
+    background: linear-gradient(90deg, #38bdf8 0%, #0ea5e9 45%, #2563eb 100%);
+}
+
+.step-badge {
+    background: #e8edf4;
+    box-shadow: 2px 2px 5px #c5d0e0, -2px -2px 5px #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.neu-preview-loader {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 260px;
+    padding: 28px 20px;
+    text-align: center;
+    color: #1e293b;
+}
+
+.neu-preview-loader h4 {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: #0f172a;
+}
+
+.neu-preview-loader p {
+    font-size: 12.5px;
+    color: #64748b;
+}

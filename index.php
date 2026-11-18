@@ -917,15 +917,27 @@ $csrfToken = getCsrfToken();
         </div>
     </div>
 
-    <!-- Uploading & Sending Progress Modal with Real-time Animation -->
+    <!-- Process Progress Modal (Sending, Viewing/Previewing, Processing, Downloading) -->
     <div id="upload-progress-modal" class="modal-overlay hidden" aria-modal="true" role="dialog">
-        <div class="modal-card upload-progress-card">
+        <div class="modal-card upload-progress-card neu-process-card">
             <div class="upload-anim-header">
-                <div class="upload-icon-pulse">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="spin-icon">
-                        <circle cx="12" cy="12" r="10" stroke-opacity="0.25"/>
-                        <path d="M12 2a10 10 0 0 1 10 10"/>
+                <div class="neu-progress-ring" id="process-ring-wrap">
+                    <svg class="neu-progress-svg" viewBox="0 0 140 140" aria-hidden="true">
+                        <defs>
+                            <linearGradient id="neuProgressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stop-color="#38bdf8"/>
+                                <stop offset="50%" stop-color="#0ea5e9"/>
+                                <stop offset="100%" stop-color="#2563eb"/>
+                            </linearGradient>
+                        </defs>
+                        <circle class="neu-progress-track-arc" cx="70" cy="70" r="56"/>
+                        <circle id="process-ring-arc" class="neu-progress-fill-arc" cx="70" cy="70" r="56"
+                                stroke-dasharray="351.86" stroke-dashoffset="351.86"/>
                     </svg>
+                    <div class="neu-progress-inner">
+                        <span id="process-ring-pct" class="neu-progress-pct">0%</span>
+                        <span id="process-ring-label" class="neu-progress-label">LOADING...</span>
+                    </div>
                 </div>
                 <h3 id="upload-progress-title">Uploading &amp; Dispatching...</h3>
                 <p id="upload-progress-sub" class="muted">Encrypting documents and notifying recipients</p>
@@ -936,12 +948,12 @@ $csrfToken = getCsrfToken();
                 <div id="upload-progress-fill" class="upload-progress-fill"></div>
             </div>
             <div class="upload-progress-stats">
-                <span id="upload-progress-percent">15%</span>
-                <span id="upload-progress-bytes">Preparing payload...</span>
+                <span id="upload-progress-percent">0%</span>
+                <span id="upload-progress-bytes">Preparing...</span>
             </div>
 
             <!-- Live Checklist Steps with Checkmark Animations -->
-            <ul class="upload-steps-list">
+            <ul id="process-steps-list" class="upload-steps-list">
                 <li id="step-pack" class="upload-step active">
                     <span class="step-badge">1</span>
                     <span class="step-text">Packaging and encrypting attached files</span>
