@@ -3141,6 +3141,81 @@
             document.execCommand('hiliteColor', false, e.target.value);
         });
 
+        // Object selection & Text Wrapping (In Line with Text / Wrap Left / Wrap Right / Top & Bottom)
+        let selectedWordObj = null;
+        const WORD_OBJ_SELECTOR = 'img, table, .word-textbox, .word-comment-box, .word-art-text, .word-obj';
+
+        function clearSelectedWordObj() {
+            $('#gdoc-editor-paper')?.querySelectorAll('.word-obj-selected').forEach((el) => el.classList.remove('word-obj-selected'));
+            selectedWordObj = null;
+            $('#word-wrap-bar')?.classList.add('hidden');
+        }
+
+        function getWordObjWrapMode(el) {
+            if (!el) return 'inline';
+            if (el.classList.contains('wrap-left')) return 'left';
+            if (el.classList.contains('wrap-right')) return 'right';
+            if (el.classList.contains('wrap-top-bottom')) return 'top-bottom';
+            return 'inline';
+        }
+
+        function applyWordObjWrap(mode) {
+            if (!selectedWordObj) {
+                toast('Click an inserted image, shape, or table first.', 'info');
+                return;
+            }
+            selectedWordObj.classList.remove('wrap-inline', 'wrap-left', 'wrap-right', 'wrap-top-bottom');
+            selectedWordObj.classList.add(`wrap-${mode}`);
+            if ((mode === 'left' || mode === 'right') && !selectedWordObj.style.width) {
+                selectedWordObj.style.width = '45%';
+            }
+            $$('#word-wrap-bar [data-wrap-mode]').forEach((b) => {
+                b.classList.toggle('active', b.dataset.wrapMode === mode);
+            });
+            const sel = $('#word-wrap-select');
+            if (sel) sel.value = mode;
+        }
+
+        $('#gdoc-editor-paper')?.addEventListener('click', (e) => {
+            const obj = e.target.closest(WORD_OBJ_SELECTOR);
+            if (!obj || !$('#gdoc-editor-paper')?.contains(obj)) {
+                clearSelectedWordObj();
+                return;
+            }
+            $('#gdoc-editor-paper')?.querySelectorAll('.word-obj-selected').forEach((el) => el.classList.remove('word-obj-selected'));
+            selectedWordObj = obj;
+            selectedWordObj.classList.add('word-obj-selected');
+            const mode = getWordObjWrapMode(selectedWordObj);
+            $$('#word-wrap-bar [data-wrap-mode]').forEach((b) => {
+                b.classList.toggle('active', b.dataset.wrapMode === mode);
+            });
+            const sel = $('#word-wrap-select');
+            if (sel) sel.value = mode;
+            $('#word-wrap-bar')?.classList.remove('hidden');
+        });
+
+        $('#word-wrap-bar')?.addEventListener('click', (e) => {
+            const wrapBtn = e.target.closest('[data-wrap-mode]');
+            if (wrapBtn) {
+                applyWordObjWrap(wrapBtn.dataset.wrapMode);
+                return;
+            }
+            const widthBtn = e.target.closest('[data-obj-width]');
+            if (widthBtn && selectedWordObj) {
+                selectedWordObj.style.width = widthBtn.dataset.objWidth;
+                selectedWordObj.style.maxWidth = widthBtn.dataset.objWidth;
+                return;
+            }
+            if (e.target.closest('#word-obj-delete') && selectedWordObj) {
+                selectedWordObj.remove();
+                clearSelectedWordObj();
+            }
+        });
+
+        $('#word-wrap-select')?.addEventListener('change', (e) => {
+            applyWordObjWrap(e.target.value);
+        });
+
         $('#word-insert-table')?.addEventListener('click', () => {
             const spec = window.prompt('Table size (rows x cols, e.g. 3x3):', '3x3');
             if (!spec) return;
@@ -3204,7 +3279,7 @@
             if (choice.trim() === '2') {
                 document.execCommand('insertHTML', false, '<div class="word-comment-box"><strong>Callout:</strong> Enter note text here...</div><p><br></p>');
             } else if (choice.trim() === '3') {
-                document.execCommand('insertHTML', false, '<div style="background:#dbeafe;border-radius:10px;padding:12px 16px;text-align:center;font-weight:700;color:#1e40af;margin:10px 0">Section Banner</div><p><br></p>');
+                document.execCommand('insertHTML', false, '<div class="word-obj" style="background:#dbeafe;border-radius:10px;padding:12px 16px;text-align:center;font-weight:700;color:#1e40af;margin:10px 0">Section Banner</div><p><br></p>');
             } else {
                 document.execCommand('insertHTML', false, '<div class="word-textbox">Shape / Text Box content...</div><p><br></p>');
             }

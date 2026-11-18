@@ -1302,6 +1302,13 @@ $csrfToken = getCsrfToken();
                                 <option value="legal">Legal (8.5 &times; 14 in)</option>
                                 <option value="a4">A4 (8.27 &times; 11.69 in)</option>
                             </select>
+                            <label class="muted" style="font-size:12px;margin-left:8px">Wrap Text:</label>
+                            <select id="word-wrap-select" class="gdoc-tool-select" title="Select an inserted image, shape, or table first">
+                                <option value="inline">In Line with Text</option>
+                                <option value="left">Wrap Left (Square)</option>
+                                <option value="right">Wrap Right (Square)</option>
+                                <option value="top-bottom">Top and Bottom</option>
+                            </select>
                         </div>
                         <div class="word-group-label">Page Setup</div>
                     </div>
@@ -1341,6 +1348,18 @@ $csrfToken = getCsrfToken();
                 <div class="gdoc-canvas-wrap">
                     <div class="gdoc-ruler" aria-hidden="true">
                         <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span>
+                    </div>
+                    <div id="word-wrap-bar" class="word-wrap-bar hidden">
+                        <span class="muted" style="font-size:11.5px;font-weight:700">Layout:</span>
+                        <button type="button" class="gdoc-tool-btn" data-wrap-mode="inline">In Line</button>
+                        <button type="button" class="gdoc-tool-btn" data-wrap-mode="left">Wrap Left</button>
+                        <button type="button" class="gdoc-tool-btn" data-wrap-mode="right">Wrap Right</button>
+                        <button type="button" class="gdoc-tool-btn" data-wrap-mode="top-bottom">Top &amp; Bottom</button>
+                        <span class="gdoc-tool-sep"></span>
+                        <button type="button" class="gdoc-tool-btn" data-obj-width="35%">S</button>
+                        <button type="button" class="gdoc-tool-btn" data-obj-width="55%">M</button>
+                        <button type="button" class="gdoc-tool-btn" data-obj-width="100%">L</button>
+                        <button type="button" class="gdoc-tool-btn" id="word-obj-delete" title="Remove selected object" style="color:#dc2626">&times;</button>
                     </div>
                     <div class="gdoc-paper-stage" id="gdoc-paper-stage">
                         <div id="gdoc-editor-paper" class="gdoc-paper" contenteditable="true" spellcheck="true">
