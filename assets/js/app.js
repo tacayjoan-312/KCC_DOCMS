@@ -3097,20 +3097,102 @@
         $('#drive-menu-new-doc')?.addEventListener('click', openGdocComposer);
         $('#drive-quick-new-doc-btn')?.addEventListener('click', openGdocComposer);
 
-        $('#gdoc-toolbar')?.addEventListener('click', (e) => {
+        $('#word-ribbon')?.addEventListener('click', async (e) => {
+            const tabBtn = e.target.closest('[data-ribbon-tab]');
+            if (tabBtn) {
+                const tabName = tabBtn.dataset.ribbonTab;
+                $$('#word-ribbon [data-ribbon-tab]').forEach((b) => b.classList.toggle('active', b === tabBtn));
+                $$('#word-ribbon [data-ribbon-panel]').forEach((p) => {
+                    p.classList.toggle('hidden', p.dataset.ribbonPanel !== tabName);
+                });
+                return;
+            }
+
+            const styleCard = e.target.closest('[data-word-style]');
+            if (styleCard) {
+                e.preventDefault();
+                $('#gdoc-editor-paper')?.focus();
+                document.execCommand('formatBlock', false, `<${styleCard.dataset.wordStyle}>`);
+                syncGdocOutline();
+                return;
+            }
+
             const cmdBtn = e.target.closest('[data-cmd]');
-            if (!cmdBtn) return;
-            e.preventDefault();
-            $('#gdoc-editor-paper')?.focus();
-            document.execCommand(cmdBtn.dataset.cmd, false, null);
-            syncGdocOutline();
+            if (cmdBtn) {
+                e.preventDefault();
+                $('#gdoc-editor-paper')?.focus();
+                document.execCommand(cmdBtn.dataset.cmd, false, null);
+                syncGdocOutline();
+            }
         });
 
-        $('#gdoc-block-select')?.addEventListener('change', (e) => {
+        $('#word-paste-btn')?.addEventListener('click', async () => {
             $('#gdoc-editor-paper')?.focus();
-            document.execCommand('formatBlock', false, `<${e.target.value}>`);
-            syncGdocOutline();
+            try {
+                const txt = await navigator.clipboard.readText();
+                if (txt) document.execCommand('insertText', false, txt);
+            } catch {
+                toast('Use Ctrl+V to paste into the document.', 'info');
+            }
         });
+
+        $('#gdoc-hilitecolor')?.addEventListener('input', (e) => {
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand('hiliteColor', false, e.target.value);
+        });
+
+        $('#word-insert-table')?.addEventListener('click', () => {
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand(
+                'insertHTML',
+                false,
+                '<table><thead><tr><th>Column 1</th><th>Column 2</th><th>Column 3</th></tr></thead><tbody><tr><td>Cell</td><td>Cell</td><td>Cell</td></tr><tr><td>Cell</td><td>Cell</td><td>Cell</td></tr></tbody></table><p><br></p>'
+            );
+        });
+
+        $('#word-insert-link')?.addEventListener('click', () => {
+            const url = window.prompt('Enter URL (https://...):', 'https://');
+            if (!url || !url.trim()) return;
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand('createLink', false, url.trim());
+        });
+
+        $('#word-insert-date')?.addEventListener('click', () => {
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand('insertText', false, new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }));
+        });
+
+        $('#word-insert-sig')?.addEventListener('click', () => {
+            const signer = escapeHtml(state.user?.full_name || 'Authorized Signatory');
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand('insertHTML', false, `<p><br></p><p>__________________________<br><strong>${signer}</strong></p>`);
+        });
+
+        $('#word-margins-select')?.addEventListener('change', (e) => {
+            const paper = $('#gdoc-editor-paper');
+            if (!paper) return;
+            paper.classList.remove('margin-narrow', 'margin-wide');
+            if (e.target.value === 'narrow') paper.classList.add('margin-narrow');
+            if (e.target.value === 'wide') paper.classList.add('margin-wide');
+        });
+
+        $('#word-orientation-select')?.addEventListener('change', (e) => {
+            const paper = $('#gdoc-editor-paper');
+            if (!paper) return;
+            paper.classList.toggle('orient-landscape', e.target.value === 'landscape');
+        });
+
+        $('#word-toggle-ruler')?.addEventListener('click', () => {
+            $('.gdoc-ruler')?.classList.toggle('hidden');
+        });
+
+        $('#word-toggle-outline')?.addEventListener('click', () => {
+            $('.gdoc-left-pane')?.classList.toggle('hidden');
+        });
+
+        $('#word-file-new')?.addEventListener('click', openGdocComposer);
+        $('#word-file-save')?.addEventListener('click', () => saveComposedDoc(false));
+        $('#word-file-send')?.addEventListener('click', () => saveComposedDoc(true));
 
         $('#gdoc-font-select')?.addEventListener('change', (e) => {
             $('#gdoc-editor-paper')?.focus();
@@ -3165,6 +3247,8 @@
             const html = $('#gdoc-editor-paper')?.innerHTML || '';
             const folderId = Number($('#gdoc-folder-select')?.value || 0);
             const category = $('#gdoc-category-select')?.value || 'Memo';
+            const margins = $('#word-margins-select')?.value || 'normal';
+            const orientation = $('#word-orientation-select')?.value || 'portrait';
 
             showProcessModal({
                 title: 'Saving Document to File Drive...',
@@ -3181,7 +3265,7 @@
             try {
                 const data = await apiFetch('api/drive.php?action=create_doc', {
                     method: 'POST',
-                    json: { title, html, folder_id: folderId, category },
+                    json: { title, html, folder_id: folderId, category, margins, orientation },
                 });
                 updateProcessModal(100, 'Saved to File Drive!', 3, 'DONE');
                 $('#gdoc-save-status').textContent = `Saved (${data.filename})`;

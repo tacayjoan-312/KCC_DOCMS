@@ -78,6 +78,12 @@ function collectDocxRuns(DOMNode $node, array $style, array &$runs): void
         $nextStyle['italic'] = true;
     } elseif ($tag === 'u') {
         $nextStyle['underline'] = true;
+    } elseif ($tag === 's' || $tag === 'strike' || $tag === 'del') {
+        $nextStyle['strike'] = true;
+    } elseif ($tag === 'sub') {
+        $nextStyle['vert'] = 'subscript';
+    } elseif ($tag === 'sup') {
+        $nextStyle['vert'] = 'superscript';
     }
 
     if ($node instanceof DOMElement && $node->hasAttribute('style')) {
@@ -124,7 +130,7 @@ function renderDocxParagraphXml(array $runs, ?string $pStyle = null, bool $isBul
         }
         $st = $run['style'] ?? [];
         $rPr = '';
-        if (!empty($st['bold']) || !empty($st['italic']) || !empty($st['underline'])) {
+        if (!empty($st['bold']) || !empty($st['italic']) || !empty($st['underline']) || !empty($st['strike']) || !empty($st['vert'])) {
             $rPr .= '<w:rPr>';
             if (!empty($st['bold'])) {
                 $rPr .= '<w:b/>';
@@ -134,6 +140,12 @@ function renderDocxParagraphXml(array $runs, ?string $pStyle = null, bool $isBul
             }
             if (!empty($st['underline'])) {
                 $rPr .= '<w:u w:val="single"/>';
+            }
+            if (!empty($st['strike'])) {
+                $rPr .= '<w:strike/>';
+            }
+            if (!empty($st['vert'])) {
+                $rPr .= '<w:vertAlign w:val="' . xmlEscapeText((string) $st['vert']) . '"/>';
             }
             $rPr .= '</w:rPr>';
         }
@@ -147,7 +159,41 @@ function renderDocxParagraphXml(array $runs, ?string $pStyle = null, bool $isBul
     return '<w:p>' . $pPr . $runsXml . '</w:p>';
 }
 
-function htmlToDocxBytes(string $html, string $title = 'Document'): string
+function renderDocxTableXml(DOMElement $tableNode): string
+{
+    $rowsXml = '';
+    foreach ($tableNode->getElementsByTagName('tr') as $tr) {
+        $cellsXml = '';
+        foreach ($tr->childNodes as $cell) {
+            if ($cell->nodeType !== XML_ELEMENT_NODE) {
+                continue;
+            }
+            $cTag = strtolower($cell->nodeName);
+            if ($cTag !== 'td' && $cTag !== 'th') {
+                continue;
+            }
+            $runs = [];
+            collectDocxRuns($cell, $cTag === 'th' ? ['bold' => true] : [], $runs);
+            $cellsXml .= '<w:tc><w:tcPr><w:tcW w:w="2400" w:type="dxa"/></w:tcPr>' . renderDocxParagraphXml($runs) . '</w:tc>';
+        }
+        if ($cellsXml !== '') {
+            $rowsXml .= '<w:tr>' . $cellsXml . '</w:tr>';
+        }
+    }
+    if ($rowsXml === '') {
+        return '';
+    }
+    return '<w:tbl><w:tblPr><w:tblBorders>'
+        . '<w:top w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>'
+        . '<w:left w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>'
+        . '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>'
+        . '<w:right w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>'
+        . '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>'
+        . '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="CBD5E1"/>'
+        . '</w:tblBorders></w:tblPr>' . $rowsXml . '</w:tbl>';
+}
+
+function htmlToDocxBytes(string $html, string $title = 'Document', array $layout = []): string
 {
     $cleanHtml = trim($html);
     if ($cleanHtml === '') {
@@ -196,6 +242,12 @@ function htmlToDocxBytes(string $html, string $title = 'Document'): string
                     default => null,
                 };
                 $bodyXml .= renderDocxParagraphXml($runs, $pStyle);
+            } elseif ($tag === 'table') {
+                $flushInline();
+                $bodyXml .= renderDocxTableXml($child);
+            } elseif ($tag === 'hr') {
+                $flushInline();
+                $bodyXml .= '<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="CBD5E1"/></w:pBdr></w:pPr></w:p>';
             } elseif ($tag === 'ul' || $tag === 'ol') {
                 $flushInline();
                 $idx = 1;
@@ -224,10 +276,21 @@ function htmlToDocxBytes(string $html, string $title = 'Document'): string
         $bodyXml = '<w:p><w:r><w:t></w:t></w:r></w:p>';
     }
 
+    $orientation = ($layout['orientation'] ?? 'portrait') === 'landscape' ? 'landscape' : 'portrait';
+    $pgW = $orientation === 'landscape' ? 15840 : 12240;
+    $pgH = $orientation === 'landscape' ? 12240 : 15840;
+    $orientAttr = $orientation === 'landscape' ? ' w:orient="landscape"' : '';
+    $marginKey = $layout['margins'] ?? 'normal';
+    $mar = match ($marginKey) {
+        'narrow' => 720,
+        'wide' => 2160,
+        default => 1440,
+    };
+
     $documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         . '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
         . '<w:body>' . $bodyXml
-        . '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440"/></w:sectPr>'
+        . "<w:sectPr><w:pgSz w:w=\"{$pgW}\" w:h=\"{$pgH}\"{$orientAttr}/><w:pgMar w:top=\"{$mar}\" w:right=\"{$mar}\" w:bottom=\"{$mar}\" w:left=\"{$mar}\"/></w:sectPr>"
         . '</w:body></w:document>';
 
     $stylesXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'

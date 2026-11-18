@@ -1104,49 +1104,168 @@ $csrfToken = getCsrfToken();
                 </div>
             </div>
 
-            <div class="gdoc-toolbar" id="gdoc-toolbar">
-                <button type="button" class="gdoc-tool-btn" data-cmd="undo" title="Undo">&#8630;</button>
-                <button type="button" class="gdoc-tool-btn" data-cmd="redo" title="Redo">&#8631;</button>
-                <button type="button" class="gdoc-tool-btn" id="gdoc-print-btn" title="Print">&#128424;</button>
-                <span class="gdoc-tool-sep"></span>
-                <select id="gdoc-zoom-select" class="gdoc-tool-select" title="Zoom">
-                    <option value="0.85">85%</option>
-                    <option value="1" selected>100%</option>
-                    <option value="1.15">115%</option>
-                    <option value="1.25">125%</option>
-                </select>
-                <span class="gdoc-tool-sep"></span>
-                <select id="gdoc-block-select" class="gdoc-tool-select" title="Text style">
-                    <option value="P">Normal text</option>
-                    <option value="H1">Heading 1</option>
-                    <option value="H2">Heading 2</option>
-                    <option value="H3">Heading 3</option>
-                </select>
-                <select id="gdoc-font-select" class="gdoc-tool-select" title="Font">
-                    <option value="Arial">Arial</option>
-                    <option value="Georgia">Georgia</option>
-                    <option value="Times New Roman">Times New Roman</option>
-                    <option value="Courier New">Courier New</option>
-                </select>
-                <div class="gdoc-size-ctrl">
-                    <button type="button" class="gdoc-tool-btn" id="gdoc-size-dec" title="Decrease font size">-</button>
-                    <span id="gdoc-size-val" class="gdoc-size-val">11</span>
-                    <button type="button" class="gdoc-tool-btn" id="gdoc-size-inc" title="Increase font size">+</button>
+            <div class="word-ribbon" id="word-ribbon">
+                <div class="word-ribbon-tabs" role="tablist">
+                    <button type="button" class="word-tab" data-ribbon-tab="file">File</button>
+                    <button type="button" class="word-tab active" data-ribbon-tab="home">Home</button>
+                    <button type="button" class="word-tab" data-ribbon-tab="insert">Insert</button>
+                    <button type="button" class="word-tab" data-ribbon-tab="layout">Layout</button>
+                    <button type="button" class="word-tab" data-ribbon-tab="view">View</button>
                 </div>
-                <span class="gdoc-tool-sep"></span>
-                <button type="button" class="gdoc-tool-btn" data-cmd="bold" title="Bold"><strong>B</strong></button>
-                <button type="button" class="gdoc-tool-btn" data-cmd="italic" title="Italic"><em>I</em></button>
-                <button type="button" class="gdoc-tool-btn" data-cmd="underline" title="Underline"><u>U</u></button>
-                <label class="gdoc-color-btn" title="Text color">
-                    <span>A</span>
-                    <input type="color" id="gdoc-forecolor" value="#0f172a">
-                </label>
-                <span class="gdoc-tool-sep"></span>
-                <button type="button" class="gdoc-tool-btn" data-cmd="insertUnorderedList" title="Bulleted list">&#8226; List</button>
-                <button type="button" class="gdoc-tool-btn" data-cmd="insertOrderedList" title="Numbered list">1. List</button>
-                <button type="button" class="gdoc-tool-btn" data-cmd="justifyLeft" title="Align left">&#8676;</button>
-                <button type="button" class="gdoc-tool-btn" data-cmd="justifyCenter" title="Align center">&#8596;</button>
-                <button type="button" class="gdoc-tool-btn" data-cmd="justifyRight" title="Align right">&#8677;</button>
+
+                <!-- Ribbon: File -->
+                <div class="word-ribbon-panel hidden" data-ribbon-panel="file">
+                    <div class="word-group">
+                        <div class="word-group-body">
+                            <button type="button" class="gdoc-tool-btn" id="word-file-new">New Blank</button>
+                            <button type="button" class="gdoc-tool-btn" id="word-file-save">Save to Drive</button>
+                            <button type="button" class="gdoc-tool-btn" id="word-file-send">Save &amp; Send</button>
+                            <button type="button" class="gdoc-tool-btn" id="gdoc-print-btn">Print</button>
+                        </div>
+                        <div class="word-group-label">Document</div>
+                    </div>
+                </div>
+
+                <!-- Ribbon: Home (Default) -->
+                <div class="word-ribbon-panel" data-ribbon-panel="home">
+                    <div class="word-group">
+                        <div class="word-group-body">
+                            <button type="button" class="gdoc-tool-btn" id="word-paste-btn" title="Paste">&#128203; Paste</button>
+                            <button type="button" class="gdoc-tool-btn" data-cmd="cut" title="Cut">&#9986; Cut</button>
+                            <button type="button" class="gdoc-tool-btn" data-cmd="copy" title="Copy">&#128196; Copy</button>
+                        </div>
+                        <div class="word-group-label">Clipboard</div>
+                    </div>
+
+                    <div class="word-group">
+                        <div class="word-group-body word-group-rows">
+                            <div class="word-row">
+                                <select id="gdoc-font-select" class="gdoc-tool-select" title="Font">
+                                    <option value="Calibri, Arial, sans-serif">Calibri (Body)</option>
+                                    <option value="Arial">Arial</option>
+                                    <option value="Georgia">Georgia</option>
+                                    <option value="Times New Roman">Times New Roman</option>
+                                    <option value="Courier New">Courier New</option>
+                                </select>
+                                <div class="gdoc-size-ctrl">
+                                    <button type="button" class="gdoc-tool-btn" id="gdoc-size-dec" title="Decrease font size">A-</button>
+                                    <span id="gdoc-size-val" class="gdoc-size-val">11</span>
+                                    <button type="button" class="gdoc-tool-btn" id="gdoc-size-inc" title="Increase font size">A+</button>
+                                </div>
+                                <button type="button" class="gdoc-tool-btn" data-cmd="removeFormat" title="Clear All Formatting">Ax</button>
+                            </div>
+                            <div class="word-row">
+                                <button type="button" class="gdoc-tool-btn" data-cmd="bold" title="Bold"><strong>B</strong></button>
+                                <button type="button" class="gdoc-tool-btn" data-cmd="italic" title="Italic"><em>I</em></button>
+                                <button type="button" class="gdoc-tool-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+                                <button type="button" class="gdoc-tool-btn" data-cmd="strikeThrough" title="Strikethrough"><s>ab</s></button>
+                                <button type="button" class="gdoc-tool-btn" data-cmd="subscript" title="Subscript">x<sub>2</sub></button>
+                                <button type="button" class="gdoc-tool-btn" data-cmd="superscript" title="Superscript">x<sup>2</sup></button>
+                                <label class="gdoc-color-btn" title="Text Highlight Color">
+                                    <span>ab</span>
+                                    <input type="color" id="gdoc-hilitecolor" value="#fef08a">
+                                </label>
+                                <label class="gdoc-color-btn" title="Font Color">
+                                    <span>A</span>
+                                    <input type="color" id="gdoc-forecolor" value="#0f172a">
+                                </label>
+                            </div>
+                        </div>
+                        <div class="word-group-label">Font</div>
+                    </div>
+
+                    <div class="word-group">
+                        <div class="word-group-body word-group-rows">
+                            <div class="word-row">
+                                <button type="button" class="gdoc-tool-btn" data-cmd="insertUnorderedList" title="Bullets">&#8226; Bullets</button>
+                                <button type="button" class="gdoc-tool-btn" data-cmd="insertOrderedList" title="Numbering">1. List</button>
+                                <button type="button" class="gdoc-tool-btn" data-cmd="outdent" title="Decrease Indent">&#8676;</button>
+                                <button type="button" class="gdoc-tool-btn" data-cmd="indent" title="Increase Indent">&#8677;</button>
+                            </div>
+                            <div class="word-row">
+                                <button type="button" class="gdoc-tool-btn" data-cmd="justifyLeft" title="Align Left">Left</button>
+                                <button type="button" class="gdoc-tool-btn" data-cmd="justifyCenter" title="Center">Center</button>
+                                <button type="button" class="gdoc-tool-btn" data-cmd="justifyRight" title="Align Right">Right</button>
+                                <button type="button" class="gdoc-tool-btn" data-cmd="justifyFull" title="Justify">Justify</button>
+                            </div>
+                        </div>
+                        <div class="word-group-label">Paragraph</div>
+                    </div>
+
+                    <div class="word-group word-styles-group">
+                        <div class="word-group-body word-styles-gallery">
+                            <button type="button" class="word-style-card" data-word-style="P">
+                                <span class="wsc-preview" style="font-size:13px">AaBbCc</span>
+                                <span class="wsc-name">Normal</span>
+                            </button>
+                            <button type="button" class="word-style-card" data-word-style="H1">
+                                <span class="wsc-preview" style="font-size:14px;font-weight:700;color:#2563eb">AaBbCc</span>
+                                <span class="wsc-name">Heading 1</span>
+                            </button>
+                            <button type="button" class="word-style-card" data-word-style="H2">
+                                <span class="wsc-preview" style="font-size:13px;font-weight:700;color:#3b82f6">AaBbCc</span>
+                                <span class="wsc-name">Heading 2</span>
+                            </button>
+                            <button type="button" class="word-style-card" data-word-style="H3">
+                                <span class="wsc-preview" style="font-size:12px;font-weight:700;color:#475569">AaBbCc</span>
+                                <span class="wsc-name">Heading 3</span>
+                            </button>
+                        </div>
+                        <div class="word-group-label">Styles</div>
+                    </div>
+                </div>
+
+                <!-- Ribbon: Insert -->
+                <div class="word-ribbon-panel hidden" data-ribbon-panel="insert">
+                    <div class="word-group">
+                        <div class="word-group-body">
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-table">&#8862; Table (3&times;3)</button>
+                            <button type="button" class="gdoc-tool-btn" data-cmd="insertHorizontalRule">&#8212; Horizontal Line</button>
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-link">&#128279; Link</button>
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-date">&#128197; Today's Date</button>
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-sig">&#9998; Signature Block</button>
+                        </div>
+                        <div class="word-group-label">Insert Elements</div>
+                    </div>
+                </div>
+
+                <!-- Ribbon: Layout -->
+                <div class="word-ribbon-panel hidden" data-ribbon-panel="layout">
+                    <div class="word-group">
+                        <div class="word-group-body">
+                            <label class="muted" style="font-size:12px">Margins:</label>
+                            <select id="word-margins-select" class="gdoc-tool-select">
+                                <option value="normal" selected>Normal (1 in)</option>
+                                <option value="narrow">Narrow (0.5 in)</option>
+                                <option value="wide">Wide (1.5 in)</option>
+                            </select>
+                            <label class="muted" style="font-size:12px;margin-left:8px">Orientation:</label>
+                            <select id="word-orientation-select" class="gdoc-tool-select">
+                                <option value="portrait" selected>Portrait</option>
+                                <option value="landscape">Landscape</option>
+                            </select>
+                        </div>
+                        <div class="word-group-label">Page Setup</div>
+                    </div>
+                </div>
+
+                <!-- Ribbon: View -->
+                <div class="word-ribbon-panel hidden" data-ribbon-panel="view">
+                    <div class="word-group">
+                        <div class="word-group-body">
+                            <label class="muted" style="font-size:12px">Zoom:</label>
+                            <select id="gdoc-zoom-select" class="gdoc-tool-select" title="Zoom">
+                                <option value="0.85">85%</option>
+                                <option value="1" selected>100%</option>
+                                <option value="1.15">115%</option>
+                                <option value="1.25">125%</option>
+                            </select>
+                            <button type="button" class="gdoc-tool-btn" id="word-toggle-ruler">Toggle Ruler</button>
+                            <button type="button" class="gdoc-tool-btn" id="word-toggle-outline">Toggle Outline</button>
+                        </div>
+                        <div class="word-group-label">Show &amp; Zoom</div>
+                    </div>
+                </div>
             </div>
 
             <div class="gdoc-body">

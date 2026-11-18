@@ -484,7 +484,10 @@ if ($method === 'POST') {
             $originalFilename = $safeBase;
         }
 
-        $docxBytes = htmlToDocxBytes($html, $title);
+        $docxBytes = htmlToDocxBytes($html, $title, [
+            'orientation' => (string) ($body['orientation'] ?? 'portrait'),
+            'margins' => (string) ($body['margins'] ?? 'normal'),
+        ]);
         $fileSize = strlen($docxBytes);
 
         ensureUploadDir();
