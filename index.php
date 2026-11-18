@@ -499,6 +499,9 @@ $csrfToken = getCsrfToken();
                                     <button type="button" id="drive-add-new-btn" class="gd-add-btn">
                                         <span>+ Add New</span>
                                     </button>
+                                    <button type="button" id="drive-quick-new-doc-btn" class="btn btn-outline btn-sm btn-block" style="margin-top:8px">
+                                        <span>&#128196; New Document</span>
+                                    </button>
                                     <div id="drive-add-menu" class="gd-add-menu hidden">
                                         <button type="button" id="drive-menu-new-doc">New Document (Docs)</button>
                                         <button type="button" id="drive-menu-new-folder">New Folder</button>

@@ -3081,7 +3081,7 @@
             }).join('');
         }
 
-        $('#drive-menu-new-doc')?.addEventListener('click', () => {
+        function openGdocComposer() {
             $('#drive-add-menu')?.classList.add('hidden');
             $('#gdoc-title-input').value = 'Untitled document';
             $('#gdoc-editor-paper').innerHTML = '<p><br></p>';
@@ -3092,7 +3092,10 @@
             syncGdocOutline();
             $('#drive-doc-editor-modal')?.classList.remove('hidden');
             setTimeout(() => $('#gdoc-editor-paper')?.focus(), 50);
-        });
+        }
+
+        $('#drive-menu-new-doc')?.addEventListener('click', openGdocComposer);
+        $('#drive-quick-new-doc-btn')?.addEventListener('click', openGdocComposer);
 
         $('#gdoc-toolbar')?.addEventListener('click', (e) => {
             const cmdBtn = e.target.closest('[data-cmd]');
