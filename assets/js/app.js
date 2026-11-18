@@ -3054,6 +3054,153 @@
             promptCreateDriveFolder(state.driveFolderId || 0);
         });
 
+        // Google Docs-style Composer
+        function populateGdocFolders(selectedId = 0) {
+            const sel = $('#gdoc-folder-select');
+            if (!sel) return;
+            const folders = state.driveData?.folders || [];
+            sel.innerHTML = [
+                '<option value="0">My Files (Root)</option>',
+                ...folders.map((f) => `<option value="${Number(f.id)}">${escapeHtml(f.name)}</option>`),
+            ].join('');
+            sel.value = String(selectedId || 0);
+        }
+
+        function syncGdocOutline() {
+            const paper = $('#gdoc-editor-paper');
+            const list = $('#gdoc-headings-list');
+            if (!paper || !list) return;
+            const headings = Array.from(paper.querySelectorAll('h1, h2, h3'));
+            if (!headings.length) {
+                list.innerHTML = '<p class="gdoc-outline-hint">Headings you add to the document will appear here.</p>';
+                return;
+            }
+            list.innerHTML = headings.map((h, idx) => {
+                const indent = h.tagName === 'H1' ? 8 : (h.tagName === 'H2' ? 18 : 28);
+                return `<button type="button" class="gdoc-outline-item" data-gdoc-h-idx="${idx}" style="padding-left:${indent}px">${escapeHtml(h.textContent || 'Heading')}</button>`;
+            }).join('');
+        }
+
+        $('#drive-menu-new-doc')?.addEventListener('click', () => {
+            $('#drive-add-menu')?.classList.add('hidden');
+            $('#gdoc-title-input').value = 'Untitled document';
+            $('#gdoc-editor-paper').innerHTML = '<p><br></p>';
+            $('#gdoc-save-status').textContent = 'Ready';
+            $('#gdoc-zoom-select').value = '1';
+            $('#gdoc-editor-paper').style.transform = 'scale(1)';
+            populateGdocFolders(state.driveFolderId || 0);
+            syncGdocOutline();
+            $('#drive-doc-editor-modal')?.classList.remove('hidden');
+            setTimeout(() => $('#gdoc-editor-paper')?.focus(), 50);
+        });
+
+        $('#gdoc-toolbar')?.addEventListener('click', (e) => {
+            const cmdBtn = e.target.closest('[data-cmd]');
+            if (!cmdBtn) return;
+            e.preventDefault();
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand(cmdBtn.dataset.cmd, false, null);
+            syncGdocOutline();
+        });
+
+        $('#gdoc-block-select')?.addEventListener('change', (e) => {
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand('formatBlock', false, `<${e.target.value}>`);
+            syncGdocOutline();
+        });
+
+        $('#gdoc-font-select')?.addEventListener('change', (e) => {
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand('fontName', false, e.target.value);
+        });
+
+        $('#gdoc-forecolor')?.addEventListener('input', (e) => {
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand('foreColor', false, e.target.value);
+        });
+
+        $('#gdoc-zoom-select')?.addEventListener('change', (e) => {
+            const paper = $('#gdoc-editor-paper');
+            if (paper) paper.style.transform = `scale(${Number(e.target.value) || 1})`;
+        });
+
+        let gdocFontPt = 11;
+        const applyGdocFontPt = (pt) => {
+            gdocFontPt = Math.max(8, Math.min(36, pt));
+            $('#gdoc-size-val').textContent = String(gdocFontPt);
+            const paper = $('#gdoc-editor-paper');
+            if (paper) paper.style.fontSize = `${Math.round(gdocFontPt * 1.333)}px`;
+        };
+        $('#gdoc-size-dec')?.addEventListener('click', () => applyGdocFontPt(gdocFontPt - 1));
+        $('#gdoc-size-inc')?.addEventListener('click', () => applyGdocFontPt(gdocFontPt + 1));
+
+        $('#gdoc-print-btn')?.addEventListener('click', () => {
+            const win = window.open('', '_blank', 'width=820,height=900');
+            if (!win) return;
+            const title = escapeHtml($('#gdoc-title-input')?.value || 'Document');
+            const html = $('#gdoc-editor-paper')?.innerHTML || '';
+            win.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>body{font-family:Arial,sans-serif;padding:48px;color:#0f172a;line-height:1.6}h1,h2,h3{margin:12px 0 6px}</style></head><body>${html}</body></html>`);
+            win.document.close();
+            win.print();
+        });
+
+        $('#gdoc-editor-paper')?.addEventListener('input', () => {
+            $('#gdoc-save-status').textContent = 'Unsaved changes';
+            syncGdocOutline();
+        });
+
+        $('#gdoc-headings-list')?.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-gdoc-h-idx]');
+            if (!btn) return;
+            const headings = Array.from($('#gdoc-editor-paper')?.querySelectorAll('h1, h2, h3') || []);
+            const target = headings[Number(btn.dataset.gdocHIdx)];
+            target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+
+        async function saveComposedDoc(andSend = false) {
+            const title = ($('#gdoc-title-input')?.value || '').trim() || 'Untitled document';
+            const html = $('#gdoc-editor-paper')?.innerHTML || '';
+            const folderId = Number($('#gdoc-folder-select')?.value || 0);
+            const category = $('#gdoc-category-select')?.value || 'Memo';
+
+            showProcessModal({
+                title: 'Saving Document to File Drive...',
+                subtitle: `Generating "${title}.docx" and backing up to storage`,
+                ringLabel: 'PROCESSING',
+                steps: [
+                    'Formatting document content',
+                    'Generating .docx file in File Drive',
+                    'Saving database backup',
+                ],
+            });
+            updateProcessModal(30, 'Generating .docx file...', 1, 'PROCESSING');
+
+            try {
+                const data = await apiFetch('api/drive.php?action=create_doc', {
+                    method: 'POST',
+                    json: { title, html, folder_id: folderId, category },
+                });
+                updateProcessModal(100, 'Saved to File Drive!', 3, 'DONE');
+                $('#gdoc-save-status').textContent = `Saved (${data.filename})`;
+                toast(data.message, 'success');
+
+                await loadDrive();
+                setTimeout(() => {
+                    hideProcessModal();
+                    $('#drive-doc-editor-modal')?.classList.add('hidden');
+                    if (andSend && data.document_id) {
+                        openDriveSendModal(Number(data.document_id));
+                    }
+                }, 400);
+            } catch (err) {
+                hideProcessModal();
+                toast(err.message, 'error');
+            }
+        }
+
+        $('#gdoc-save-btn')?.addEventListener('click', () => saveComposedDoc(false));
+        $('#gdoc-share-btn')?.addEventListener('click', () => saveComposedDoc(true));
+
         $('#drive-menu-upload-files')?.addEventListener('click', () => {
             $('#drive-add-menu')?.classList.add('hidden');
             openDriveUploadModalForFolder(state.driveFolderId || 0);

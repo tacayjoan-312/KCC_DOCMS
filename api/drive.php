@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/config/app.php';
 require_once dirname(__DIR__) . '/config/mailer.php';
+require_once dirname(__DIR__) . '/config/docx_builder.php';
 
 $user = requireDriveAccess();
 $action = $_GET['action'] ?? 'overview';
@@ -449,6 +450,106 @@ if ($method === 'POST') {
 
         logActivity((int) $user['id'], $docId, 'drive_delete_file', "Removed {$doc['doc_code']} ({$doc['original_filename']}) from File Drive");
         jsonResponse(['success' => true, 'message' => "{$doc['original_filename']} removed from File Drive."]);
+    }
+
+    if ($action === 'create_doc') {
+        $title = trim((string) ($body['title'] ?? ''));
+        if ($title === '') {
+            $title = 'Untitled document';
+        }
+        if (mb_strlen($title) > 255) {
+            jsonError('Document title must be 255 characters or fewer.', 422);
+        }
+
+        $html = (string) ($body['html'] ?? '');
+        $folderId = (int) ($body['folder_id'] ?? 0);
+        $targetFolder = $folderId > 0 ? $folderId : null;
+        if ($targetFolder !== null) {
+            $fCheck = $pdo->prepare('SELECT id FROM document_folders WHERE id = ? LIMIT 1');
+            $fCheck->execute([$targetFolder]);
+            if (!$fCheck->fetch()) {
+                jsonError('Selected folder not found.', 404);
+            }
+        }
+
+        $category = trim((string) ($body['category'] ?? 'Memo'));
+        if (!in_array($category, DOCUMENT_CATEGORIES, true)) {
+            $category = 'Memo';
+        }
+
+        $safeBase = preg_replace('/[^\w.\- ()]/u', '_', $title) ?: 'Untitled_document';
+        if (!str_ends_with(strtolower($safeBase), '.docx')) {
+            $originalFilename = $safeBase . '.docx';
+        } else {
+            $originalFilename = $safeBase;
+        }
+
+        $docxBytes = htmlToDocxBytes($html, $title);
+        $fileSize = strlen($docxBytes);
+
+        ensureUploadDir();
+        $storedFilename = bin2hex(random_bytes(16)) . '.docx';
+        $destPath = UPLOAD_DIR . DIRECTORY_SEPARATOR . $storedFilename;
+        if (file_put_contents($destPath, $docxBytes) === false) {
+            jsonError('Failed to save composed document.', 500);
+        }
+
+        $mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        $pdo->beginTransaction();
+        try {
+            $docCode = generateDocumentCode($pdo);
+            $stmtDoc = $pdo->prepare(
+                'INSERT INTO documents (doc_code, sender_id, folder_id, title, category, description, original_filename, stored_filename, file_size, mime_type, file_ext, priority)
+                 VALUES (?, ?, ?, ?, ?, "", ?, ?, ?, ?, "docx", "normal")'
+            );
+            $stmtDoc->execute([
+                $docCode,
+                (int) $user['id'],
+                $targetFolder,
+                $title,
+                $category,
+                $originalFilename,
+                $storedFilename,
+                $fileSize,
+                $mimeType,
+            ]);
+            $docId = (int) $pdo->lastInsertId();
+
+            $pdo->prepare(
+                'INSERT INTO document_files (document_id, original_filename, stored_filename, file_size, mime_type, file_ext, sort_order)
+                 VALUES (?, ?, ?, ?, ?, "docx", 0)'
+            )->execute([$docId, $originalFilename, $storedFilename, $fileSize, $mimeType]);
+
+            if ($targetFolder !== null) {
+                $pdo->prepare('UPDATE document_folders SET updated_at = NOW() WHERE id = ?')->execute([$targetFolder]);
+            }
+
+            $pdo->commit();
+            saveFileToDbChunks($pdo, $storedFilename, $destPath);
+
+            logActivity(
+                (int) $user['id'],
+                $docId,
+                'drive_create_doc',
+                "Composed {$docCode} ({$originalFilename}) in File Drive"
+            );
+
+            jsonResponse([
+                'success' => true,
+                'document_id' => $docId,
+                'doc_code' => $docCode,
+                'filename' => $originalFilename,
+                'message' => "\"{$originalFilename}\" saved to File Drive.",
+            ]);
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            if (is_file($destPath)) {
+                @unlink($destPath);
+            }
+            throw $e;
+        }
     }
 }
 

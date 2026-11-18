@@ -500,6 +500,7 @@ $csrfToken = getCsrfToken();
                                         <span>+ Add New</span>
                                     </button>
                                     <div id="drive-add-menu" class="gd-add-menu hidden">
+                                        <button type="button" id="drive-menu-new-doc">New Document (Docs)</button>
                                         <button type="button" id="drive-menu-new-folder">New Folder</button>
                                         <button type="button" id="drive-menu-upload-files">Upload Files</button>
                                         <button type="button" id="drive-menu-upload-folder">Upload Folder</button>
@@ -1065,6 +1066,109 @@ $csrfToken = getCsrfToken();
                     <button type="submit" id="drive-send-submit-btn" class="btn btn-primary">Send Document</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal: Google Docs-style Document Composer -->
+    <div id="drive-doc-editor-modal" class="modal hidden" role="dialog" aria-modal="true" aria-label="Document Composer">
+        <div class="modal-backdrop" data-close-modal="drive-doc-editor-modal"></div>
+        <div class="modal-dialog gdoc-dialog">
+            <div class="gdoc-topbar">
+                <div class="gdoc-topbar-left">
+                    <div class="gdoc-doc-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm2 14H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                    </div>
+                    <div class="gdoc-title-meta">
+                        <input type="text" id="gdoc-title-input" class="gdoc-title-input" value="Untitled document" aria-label="Document title">
+                        <div class="gdoc-menubar">
+                            <select id="gdoc-folder-select" class="gdoc-mini-select" title="Save to folder"></select>
+                            <select id="gdoc-category-select" class="gdoc-mini-select" title="Document category">
+                                <?php foreach (DOCUMENT_CATEGORIES as $cat): ?>
+                                    <option value="<?= htmlspecialchars($cat, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($cat, ENT_QUOTES, 'UTF-8') ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <span id="gdoc-save-status" class="muted" style="font-size:11.5px">Ready</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="gdoc-topbar-right">
+                    <button type="button" id="gdoc-save-btn" class="btn btn-outline btn-sm">Save to Drive</button>
+                    <button type="button" id="gdoc-share-btn" class="gdoc-share-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        <span>Save &amp; Send</span>
+                    </button>
+                    <button type="button" class="icon-btn" data-close-modal="drive-doc-editor-modal" aria-label="Close">&times;</button>
+                </div>
+            </div>
+
+            <div class="gdoc-toolbar" id="gdoc-toolbar">
+                <button type="button" class="gdoc-tool-btn" data-cmd="undo" title="Undo">&#8630;</button>
+                <button type="button" class="gdoc-tool-btn" data-cmd="redo" title="Redo">&#8631;</button>
+                <button type="button" class="gdoc-tool-btn" id="gdoc-print-btn" title="Print">&#128424;</button>
+                <span class="gdoc-tool-sep"></span>
+                <select id="gdoc-zoom-select" class="gdoc-tool-select" title="Zoom">
+                    <option value="0.85">85%</option>
+                    <option value="1" selected>100%</option>
+                    <option value="1.15">115%</option>
+                    <option value="1.25">125%</option>
+                </select>
+                <span class="gdoc-tool-sep"></span>
+                <select id="gdoc-block-select" class="gdoc-tool-select" title="Text style">
+                    <option value="P">Normal text</option>
+                    <option value="H1">Heading 1</option>
+                    <option value="H2">Heading 2</option>
+                    <option value="H3">Heading 3</option>
+                </select>
+                <select id="gdoc-font-select" class="gdoc-tool-select" title="Font">
+                    <option value="Arial">Arial</option>
+                    <option value="Georgia">Georgia</option>
+                    <option value="Times New Roman">Times New Roman</option>
+                    <option value="Courier New">Courier New</option>
+                </select>
+                <div class="gdoc-size-ctrl">
+                    <button type="button" class="gdoc-tool-btn" id="gdoc-size-dec" title="Decrease font size">-</button>
+                    <span id="gdoc-size-val" class="gdoc-size-val">11</span>
+                    <button type="button" class="gdoc-tool-btn" id="gdoc-size-inc" title="Increase font size">+</button>
+                </div>
+                <span class="gdoc-tool-sep"></span>
+                <button type="button" class="gdoc-tool-btn" data-cmd="bold" title="Bold"><strong>B</strong></button>
+                <button type="button" class="gdoc-tool-btn" data-cmd="italic" title="Italic"><em>I</em></button>
+                <button type="button" class="gdoc-tool-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+                <label class="gdoc-color-btn" title="Text color">
+                    <span>A</span>
+                    <input type="color" id="gdoc-forecolor" value="#0f172a">
+                </label>
+                <span class="gdoc-tool-sep"></span>
+                <button type="button" class="gdoc-tool-btn" data-cmd="insertUnorderedList" title="Bulleted list">&#8226; List</button>
+                <button type="button" class="gdoc-tool-btn" data-cmd="insertOrderedList" title="Numbered list">1. List</button>
+                <button type="button" class="gdoc-tool-btn" data-cmd="justifyLeft" title="Align left">&#8676;</button>
+                <button type="button" class="gdoc-tool-btn" data-cmd="justifyCenter" title="Align center">&#8596;</button>
+                <button type="button" class="gdoc-tool-btn" data-cmd="justifyRight" title="Align right">&#8677;</button>
+            </div>
+
+            <div class="gdoc-body">
+                <aside class="gdoc-left-pane">
+                    <div class="gdoc-left-header">
+                        <span>Document tabs</span>
+                    </div>
+                    <div class="gdoc-tab-pill active">
+                        <span>&#128196; Tab 1</span>
+                    </div>
+                    <div id="gdoc-headings-list" class="gdoc-headings-list">
+                        <p class="gdoc-outline-hint">Headings you add to the document will appear here.</p>
+                    </div>
+                </aside>
+                <div class="gdoc-canvas-wrap">
+                    <div class="gdoc-ruler" aria-hidden="true">
+                        <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span>
+                    </div>
+                    <div class="gdoc-paper-stage" id="gdoc-paper-stage">
+                        <div id="gdoc-editor-paper" class="gdoc-paper" contenteditable="true" spellcheck="true">
+                            <p>Start typing your document here...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

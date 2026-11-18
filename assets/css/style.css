@@ -3605,6 +3605,337 @@ body {
     transform: scale(1.02);
 }
 
+/* ==========================================================================
+   GOOGLE DOCS-STYLE DOCUMENT COMPOSER
+   ========================================================================== */
+.gdoc-dialog {
+    max-width: 1180px;
+    width: 96vw;
+    height: 90vh;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.gdoc-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border-subtle);
+    flex-wrap: wrap;
+}
+
+.gdoc-topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 240px;
+}
+
+.gdoc-doc-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: linear-gradient(145deg, #3b82f6, #2563eb);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 3px 3px 8px #c5d0e0, -3px -3px 8px #ffffff;
+}
+
+.gdoc-doc-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.gdoc-title-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.gdoc-title-input {
+    border: 1px solid transparent;
+    background: transparent;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    padding: 2px 6px;
+    border-radius: 7px;
+    max-width: 340px;
+}
+
+.gdoc-title-input:hover,
+.gdoc-title-input:focus {
+    outline: none;
+    background: #ffffff;
+    border-color: #93c5fd;
+}
+
+.gdoc-menubar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.gdoc-mini-select {
+    border: 1px solid rgba(197, 208, 224, 0.75);
+    background: #e8edf4;
+    border-radius: 7px;
+    padding: 3px 8px;
+    font-size: 12px;
+    color: var(--text);
+    box-shadow: var(--neu-inset);
+}
+
+.gdoc-topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.gdoc-share-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    background: #c2e7ff;
+    color: #001d35;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    box-shadow: 4px 4px 10px #c5d0e0, -4px -4px 10px #ffffff;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.gdoc-share-btn:hover {
+    background: #a8dcff;
+    transform: translateY(-1px);
+}
+
+.gdoc-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    margin: 10px 16px 0;
+    border-radius: 999px;
+    background: #edf2f8;
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    box-shadow: var(--neu-raised-sm);
+    flex-wrap: wrap;
+}
+
+.gdoc-tool-btn {
+    border: none;
+    background: transparent;
+    color: #334155;
+    padding: 5px 8px;
+    border-radius: 7px;
+    font-size: 13px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gdoc-tool-btn:hover {
+    background: rgba(59, 130, 246, 0.12);
+    color: #1d4ed8;
+}
+
+.gdoc-tool-select {
+    border: 1px solid rgba(197, 208, 224, 0.6);
+    background: #e8edf4;
+    border-radius: 8px;
+    padding: 4px 8px;
+    font-size: 12.5px;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.gdoc-tool-sep {
+    width: 1px;
+    height: 18px;
+    background: rgba(148, 163, 184, 0.45);
+    margin: 0 2px;
+}
+
+.gdoc-size-ctrl {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    border: 1px solid rgba(197, 208, 224, 0.7);
+    border-radius: 8px;
+    padding: 1px 4px;
+    background: #e8edf4;
+}
+
+.gdoc-size-val {
+    min-width: 24px;
+    text-align: center;
+    font-size: 12.5px;
+    font-weight: 600;
+}
+
+.gdoc-color-btn {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 7px;
+    font-size: 12.5px;
+    font-weight: 700;
+}
+
+.gdoc-color-btn:hover {
+    background: rgba(59, 130, 246, 0.12);
+}
+
+.gdoc-color-btn input[type="color"] {
+    width: 18px;
+    height: 4px;
+    border: none;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+}
+
+.gdoc-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    margin-top: 10px;
+}
+
+.gdoc-left-pane {
+    width: 220px;
+    flex-shrink: 0;
+    padding: 14px 12px;
+    border-right: 1px solid var(--border-subtle);
+    overflow-y: auto;
+}
+
+.gdoc-left-header {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 10px;
+    padding: 0 6px;
+}
+
+.gdoc-tab-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 14px;
+}
+
+.gdoc-outline-hint {
+    font-size: 12px;
+    font-style: italic;
+    color: var(--text-muted);
+    padding: 0 6px;
+}
+
+.gdoc-outline-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    background: transparent;
+    padding: 5px 8px;
+    border-radius: 7px;
+    font-size: 12.5px;
+    color: #334155;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gdoc-outline-item:hover {
+    background: rgba(255, 255, 255, 0.65);
+    color: #1d4ed8;
+}
+
+.gdoc-canvas-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #dfe5ee;
+}
+
+.gdoc-ruler {
+    display: flex;
+    justify-content: space-around;
+    padding: 4px 60px;
+    background: #edf2f8;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 10px;
+    color: #64748b;
+    user-select: none;
+}
+
+.gdoc-paper-stage {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 20px 40px;
+    display: flex;
+    justify-content: center;
+}
+
+.gdoc-paper {
+    width: 100%;
+    max-width: 780px;
+    min-height: 820px;
+    background: #ffffff;
+    color: #0f172a;
+    padding: 56px 64px;
+    border-radius: 4px;
+    box-shadow: 0 4px 18px rgba(15, 23, 42, 0.12);
+    font-family: Arial, sans-serif;
+    font-size: 14.5px;
+    line-height: 1.6;
+    outline: none;
+    transform-origin: top center;
+}
+
+.gdoc-paper h1 { font-size: 24px; margin: 14px 0 8px; }
+.gdoc-paper h2 { font-size: 19px; margin: 12px 0 6px; }
+.gdoc-paper h3 { font-size: 16px; margin: 10px 0 4px; }
+.gdoc-paper p { margin: 0 0 10px; }
+.gdoc-paper ul, .gdoc-paper ol { margin: 0 0 10px 24px; }
+
+@media (max-width: 820px) {
+    .gdoc-left-pane {
+        display: none;
+    }
+    .gdoc-paper {
+        padding: 28px 22px;
+        min-height: 480px;
+    }
+}
+
 .gd-folder-icon-wrap {
     padding: 6px 2px 14px;
 }
