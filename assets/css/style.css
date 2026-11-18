@@ -3903,16 +3903,27 @@ body {
 .gdoc-paper-stage {
     flex: 1;
     overflow-y: auto;
-    padding: 24px 20px 40px;
+    padding: 24px 20px 48px;
     display: flex;
     justify-content: center;
+    align-items: flex-start;
 }
 
 .gdoc-paper {
+    --page-h: 1056px;
     width: 100%;
     max-width: 780px;
-    min-height: 820px;
-    background: #ffffff;
+    min-height: var(--page-h);
+    height: auto;
+    align-self: flex-start;
+    background-color: #ffffff;
+    background-image: repeating-linear-gradient(
+        to bottom,
+        #ffffff 0px,
+        #ffffff calc(var(--page-h) - 14px),
+        #dfe5ee calc(var(--page-h) - 14px),
+        #dfe5ee var(--page-h)
+    );
     color: #0f172a;
     padding: 56px 64px;
     border-radius: 4px;
@@ -3922,6 +3933,8 @@ body {
     line-height: 1.6;
     outline: none;
     transform-origin: top center;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
 }
 
 .gdoc-paper h1 { font-size: 24px; margin: 14px 0 8px; }
@@ -3933,10 +3946,10 @@ body {
 .gdoc-paper td, .gdoc-paper th { border: 1px solid #cbd5e1; padding: 8px 10px; min-width: 60px; }
 .gdoc-paper.margin-narrow { padding: 28px 32px; }
 .gdoc-paper.margin-wide { padding: 72px 88px; }
-.gdoc-paper.size-legal { min-height: 1040px; }
-.gdoc-paper.size-a4 { max-width: 760px; min-height: 870px; }
-.gdoc-paper.orient-landscape { max-width: 1020px; min-height: 620px; }
-.gdoc-paper.orient-landscape.size-legal { max-width: 1240px; min-height: 620px; }
+.gdoc-paper.size-legal { --page-h: 1344px; }
+.gdoc-paper.size-a4 { max-width: 760px; --page-h: 1123px; }
+.gdoc-paper.orient-landscape { max-width: 1020px; --page-h: 780px; }
+.gdoc-paper.orient-landscape.size-legal { max-width: 1240px; --page-h: 780px; }
 
 /* Microsoft Word-style Ribbon */
 .word-ribbon {
