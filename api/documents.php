@@ -62,7 +62,10 @@ if ($method === 'GET') {
     }
 
     if ($action === 'sent') {
-        $where = ['d.sender_id = ?'];
+        $where = [
+            'd.sender_id = ?',
+            'EXISTS (SELECT 1 FROM document_recipients dr_sent WHERE dr_sent.document_id = d.id)',
+        ];
         $params = [(int) $user['id']];
 
         if ($search !== '') {
@@ -111,7 +114,10 @@ if ($method === 'GET') {
         $statusFilter = trim((string) ($_GET['status'] ?? 'all'));
         $senderFilter = (int) ($_GET['sender_id'] ?? 0);
 
-        $where = ['1=1'];
+        $where = [
+            '1=1',
+            'EXISTS (SELECT 1 FROM document_recipients dr_sent WHERE dr_sent.document_id = d.id)',
+        ];
         $params = [];
 
         if ($search !== '') {

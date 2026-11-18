@@ -26,7 +26,11 @@ if ($action === 'user_stats') {
     $stmtInbox->execute([$uid]);
     $inboxStats = $stmtInbox->fetch() ?: ['total' => 0, 'unread' => 0, 'downloads' => 0];
 
-    $stmtSent = $pdo->prepare('SELECT COUNT(*) FROM documents WHERE sender_id = ?');
+    $stmtSent = $pdo->prepare(
+        'SELECT COUNT(*) FROM documents d
+         WHERE d.sender_id = ?
+           AND EXISTS (SELECT 1 FROM document_recipients dr WHERE dr.document_id = d.id)'
+    );
     $stmtSent->execute([$uid]);
     $sentCount = (int) $stmtSent->fetchColumn();
 
@@ -54,7 +58,8 @@ if ($action === 'admin_stats') {
                 COALESCE(SUM(CASE WHEN status = "active" THEN 1 ELSE 0 END), 0) AS active_documents,
                 COALESCE(SUM(CASE WHEN status = "archived" THEN 1 ELSE 0 END), 0) AS archived_documents,
                 COALESCE(SUM(CASE WHEN status = "flagged" THEN 1 ELSE 0 END), 0) AS flagged_documents
-         FROM documents'
+         FROM documents d
+         WHERE EXISTS (SELECT 1 FROM document_recipients dr WHERE dr.document_id = d.id)'
     )->fetch();
 
     $userStats = $pdo->query(
@@ -71,7 +76,8 @@ if ($action === 'admin_stats') {
 
     $byCategory = $pdo->query(
         'SELECT category, COUNT(*) AS count, COALESCE(SUM(file_size), 0) AS bytes
-         FROM documents
+         FROM documents d
+         WHERE EXISTS (SELECT 1 FROM document_recipients dr WHERE dr.document_id = d.id)
          GROUP BY category
          ORDER BY count DESC'
     )->fetchAll();
