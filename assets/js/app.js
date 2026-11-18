@@ -1316,6 +1316,7 @@
                                             <button type="button" class="btn btn-primary btn-xs" data-drive-send-file="${d.id}">Send</button>
                                             <a href="api/file.php?id=${d.id}&mode=download" class="btn btn-outline btn-xs">DL</a>
                                             <button type="button" class="btn btn-outline btn-xs" data-drive-move-file="${d.id}">Move</button>
+                                            <button type="button" class="btn btn-danger btn-xs" data-drive-delete-file="${d.id}" data-doc-name="${escapeHtml(d.original_filename || d.title)}">Remove</button>
                                         </div>
                                     </td>
                                 </tr>
@@ -3539,6 +3540,24 @@
             renderDriveCanvas();
         });
 
+        async function deleteDriveFile(docId, label = '') {
+            const doc = (state.driveData?.files || []).find((f) => Number(f.id) === Number(docId));
+            const name = label || doc?.original_filename || doc?.title || `Document #${docId}`;
+            if (!window.confirm(`Remove "${name}" permanently from File Drive? This cannot be undone.`)) {
+                return;
+            }
+            try {
+                const data = await apiFetch('api/drive.php?action=delete_file', {
+                    method: 'POST',
+                    json: { document_id: docId },
+                });
+                toast(data.message, 'success');
+                loadDrive();
+            } catch (err) {
+                toast(err.message, 'error');
+            }
+        }
+
         async function openDriveMovePrompt(docId) {
             const folders = state.driveData?.folders || [];
             const optionsText = folders.map((f) => `${f.id}: ${f.name}`).join('\n');
@@ -3641,6 +3660,7 @@
                     <button type="button" data-act="send">Send to Users...</button>
                     <button type="button" data-act="download">Download</button>
                     <button type="button" data-act="move">Move to Folder...</button>
+                    <button type="button" class="danger" data-act="delete">Remove File</button>
                 `;
                 menu.addEventListener('click', (me) => {
                     const act = me.target.closest('button')?.dataset.act;
@@ -3649,8 +3669,15 @@
                     if (act === 'send') openDriveSendModal(docId);
                     if (act === 'download') downloadFileWithProgress(`api/file.php?id=${docId}&mode=download`);
                     if (act === 'move') openDriveMovePrompt(docId);
+                    if (act === 'delete') deleteDriveFile(docId);
                 });
                 document.body.appendChild(menu);
+                return;
+            }
+
+            const delFileBtn = e.target.closest('[data-drive-delete-file]');
+            if (delFileBtn) {
+                deleteDriveFile(Number(delFileBtn.dataset.driveDeleteFile), delFileBtn.dataset.docName || '');
                 return;
             }
 

@@ -404,6 +404,52 @@ if ($method === 'POST') {
         $pdo->prepare('UPDATE documents SET folder_id = ? WHERE id = ?')->execute([$targetFolder, $docId]);
         jsonResponse(['success' => true, 'message' => $targetFolder ? 'File moved to folder.' : 'File moved to root.']);
     }
+
+    if ($action === 'delete_file') {
+        $docId = (int) ($body['document_id'] ?? 0);
+        if ($docId <= 0) {
+            jsonError('Invalid document ID.', 400);
+        }
+
+        $docStmt = $pdo->prepare('SELECT id, doc_code, sender_id, stored_filename, original_filename FROM documents WHERE id = ? LIMIT 1');
+        $docStmt->execute([$docId]);
+        $doc = $docStmt->fetch();
+        if (!$doc) {
+            jsonError('File not found.', 404);
+        }
+
+        $isAdmin = ($user['role'] ?? '') === 'admin';
+        if (!$isAdmin && (int) $doc['sender_id'] !== (int) $user['id']) {
+            jsonError('You do not have permission to remove this file.', 403);
+        }
+
+        $filesStmt = $pdo->prepare('SELECT stored_filename FROM document_files WHERE document_id = ?');
+        $filesStmt->execute([$docId]);
+        $storedNames = [];
+        foreach ($filesStmt->fetchAll() as $fr) {
+            $base = basename((string) ($fr['stored_filename'] ?? ''));
+            if ($base !== '') {
+                $storedNames[$base] = true;
+            }
+        }
+        $primaryBase = basename((string) ($doc['stored_filename'] ?? ''));
+        if ($primaryBase !== '') {
+            $storedNames[$primaryBase] = true;
+        }
+
+        $pdo->prepare('DELETE FROM documents WHERE id = ?')->execute([$docId]);
+
+        foreach (array_keys($storedNames) as $storedBase) {
+            $filePath = UPLOAD_DIR . DIRECTORY_SEPARATOR . $storedBase;
+            if (is_file($filePath)) {
+                @unlink($filePath);
+            }
+            deleteFileDbChunks($pdo, $storedBase);
+        }
+
+        logActivity((int) $user['id'], $docId, 'drive_delete_file', "Removed {$doc['doc_code']} ({$doc['original_filename']}) from File Drive");
+        jsonResponse(['success' => true, 'message' => "{$doc['original_filename']} removed from File Drive."]);
+    }
 }
 
 jsonError('Unknown drive action.', 404);
