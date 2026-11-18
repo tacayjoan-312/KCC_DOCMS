@@ -509,10 +509,13 @@ $csrfToken = getCsrfToken();
                                 <div id="drive-folder-tree" class="gd-tree"></div>
                             </aside>
 
-                            <div class="gd-main">
+                            <div class="gd-main" id="drive-drop-zone">
                                 <div class="gd-breadcrumb-bar">
                                     <button type="button" id="drive-refresh-btn" class="drive-menu-btn" title="Refresh">&#8635;</button>
                                     <div id="drive-breadcrumb" class="gd-breadcrumb"></div>
+                                </div>
+                                <div id="drive-drop-banner" class="gd-drop-banner hidden">
+                                    Drop files or folders here to upload to <strong id="drive-drop-target-name">My Files</strong>
                                 </div>
                                 <div id="drive-canvas" class="gd-canvas"></div>
                             </div>

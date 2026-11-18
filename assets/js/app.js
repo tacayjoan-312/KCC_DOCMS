@@ -3100,6 +3100,194 @@
             }
         });
 
+        // Drag-and-drop files or folders into File Drive (current folder or onto a folder card)
+        function readFileEntry(fileEntry, relDir) {
+            return new Promise((resolve) => {
+                fileEntry.file((file) => {
+                    resolve([{ file, relDir }]);
+                }, () => resolve([]));
+            });
+        }
+
+        function readDirectoryEntries(dirEntry, relDir) {
+            return new Promise((resolve) => {
+                const reader = dirEntry.createReader();
+                const allEntries = [];
+                const readNext = () => {
+                    reader.readEntries(async (batch) => {
+                        if (!batch.length) {
+                            const nested = [];
+                            for (const ent of allEntries) {
+                                if (ent.isFile) {
+                                    nested.push(...await readFileEntry(ent, relDir));
+                                } else if (ent.isDirectory) {
+                                    const subDir = relDir ? `${relDir}/${ent.name}` : ent.name;
+                                    nested.push(...await readDirectoryEntries(ent, subDir));
+                                }
+                            }
+                            resolve(nested);
+                            return;
+                        }
+                        allEntries.push(...batch);
+                        readNext();
+                    }, () => resolve([]));
+                };
+                readNext();
+            });
+        }
+
+        async function extractDroppedDriveItems(dataTransfer) {
+            const items = Array.from(dataTransfer?.items || []);
+            if (items.length && typeof items[0].webkitGetAsEntry === 'function') {
+                const collected = [];
+                for (const item of items) {
+                    const entry = item.webkitGetAsEntry();
+                    if (!entry) continue;
+                    if (entry.isFile) {
+                        collected.push(...await readFileEntry(entry, ''));
+                    } else if (entry.isDirectory) {
+                        collected.push(...await readDirectoryEntries(entry, entry.name));
+                    }
+                }
+                if (collected.length) return collected;
+            }
+            return Array.from(dataTransfer?.files || []).map((file) => ({ file, relDir: '' }));
+        }
+
+        async function uploadDroppedToDrive(droppedItems, targetFolderId, targetLabel) {
+            if (!droppedItems.length) return;
+            showProcessModal({
+                title: `Uploading to "${targetLabel}"...`,
+                subtitle: `Uploading ${droppedItems.length} file(s) to File Drive`,
+                ringLabel: 'UPLOADING',
+                steps: [
+                    'Preparing dropped files & folders',
+                    'Uploading to File Drive',
+                    'Refreshing folder view',
+                ],
+            });
+            updateProcessModal(8, `Preparing ${droppedItems.length} file(s)...`, 0, 'UPLOADING');
+
+            try {
+                const folderCache = new Map();
+                folderCache.set('', Number(targetFolderId || 0));
+
+                const ensureFolderPath = async (relDir) => {
+                    if (!relDir) return Number(targetFolderId || 0);
+                    if (folderCache.has(relDir)) return folderCache.get(relDir);
+                    const parts = relDir.split('/').filter(Boolean);
+                    let currPath = '';
+                    let parentId = Number(targetFolderId || 0);
+                    for (const part of parts) {
+                        currPath = currPath ? `${currPath}/${part}` : part;
+                        if (folderCache.has(currPath)) {
+                            parentId = folderCache.get(currPath);
+                        } else {
+                            const created = await apiFetch('api/drive.php?action=create_folder', {
+                                method: 'POST',
+                                json: { name: part, parent_id: parentId },
+                            });
+                            parentId = Number(created.folder_id || 0);
+                            folderCache.set(currPath, parentId);
+                        }
+                    }
+                    return parentId;
+                };
+
+                let done = 0;
+                for (const item of droppedItems) {
+                    const destFolderId = await ensureFolderPath(item.relDir);
+                    const fd = new FormData();
+                    fd.append('folder_id', String(destFolderId));
+                    fd.append('title', item.file.name.replace(/\.[^.]+$/, '') || item.file.name);
+                    fd.append('category', 'Other');
+                    fd.append('files[]', item.file);
+
+                    await apiUploadWithProgress('api/drive.php?action=upload_file', fd, (loaded, total) => {
+                        const fileFrac = total > 0 ? loaded / total : 1;
+                        const overall = Math.min(92, 12 + Math.round(((done + fileFrac) / droppedItems.length) * 80));
+                        updateProcessModal(overall, `Uploading ${item.file.name} (${done + 1}/${droppedItems.length})...`, 1, 'UPLOADING');
+                    });
+                    done++;
+                }
+
+                updateProcessModal(100, 'Upload complete!', 3, 'DONE');
+                toast(`Uploaded ${droppedItems.length} file(s) to "${targetLabel}".`, 'success');
+                setTimeout(() => {
+                    hideProcessModal();
+                    loadDrive();
+                }, 400);
+            } catch (err) {
+                hideProcessModal();
+                toast(err.message, 'error');
+            }
+        }
+
+        const driveDropZone = $('#drive-drop-zone');
+        if (driveDropZone) {
+            let dragDepth = 0;
+            const clearDriveDragState = () => {
+                dragDepth = 0;
+                driveDropZone.classList.remove('dragover');
+                $('#drive-drop-banner')?.classList.add('hidden');
+                driveDropZone.querySelectorAll('.dragover-target').forEach((el) => el.classList.remove('dragover-target'));
+            };
+
+            driveDropZone.addEventListener('dragenter', (e) => {
+                if (!e.dataTransfer?.types?.includes('Files')) return;
+                e.preventDefault();
+                dragDepth++;
+                driveDropZone.classList.add('dragover');
+                const banner = $('#drive-drop-banner');
+                const targetName = $('#drive-drop-target-name');
+                if (targetName) targetName.textContent = state.driveFolderName || 'My Files';
+                banner?.classList.remove('hidden');
+            });
+
+            driveDropZone.addEventListener('dragover', (e) => {
+                if (!e.dataTransfer?.types?.includes('Files')) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                driveDropZone.querySelectorAll('.dragover-target').forEach((el) => el.classList.remove('dragover-target'));
+                const folderCard = e.target.closest('.gd-card[data-drive-folder-id]');
+                const targetName = $('#drive-drop-target-name');
+                if (folderCard) {
+                    folderCard.classList.add('dragover-target');
+                    if (targetName) targetName.textContent = folderCard.dataset.driveFolderName || 'Folder';
+                } else if (targetName) {
+                    targetName.textContent = state.driveFolderName || 'My Files';
+                }
+            });
+
+            driveDropZone.addEventListener('dragleave', (e) => {
+                if (!e.dataTransfer?.types?.includes('Files')) return;
+                dragDepth = Math.max(0, dragDepth - 1);
+                if (dragDepth === 0) {
+                    clearDriveDragState();
+                }
+            });
+
+            driveDropZone.addEventListener('drop', async (e) => {
+                if (!e.dataTransfer?.types?.includes('Files')) return;
+                e.preventDefault();
+                const folderCard = e.target.closest('.gd-card[data-drive-folder-id]');
+                const targetFolderId = folderCard
+                    ? Number(folderCard.dataset.driveFolderId || 0)
+                    : Number(state.driveFolderId || 0);
+                const targetLabel = folderCard
+                    ? (folderCard.dataset.driveFolderName || 'Folder')
+                    : (state.driveFolderName || 'My Files');
+                clearDriveDragState();
+
+                const droppedItems = await extractDroppedDriveItems(e.dataTransfer);
+                if (!droppedItems.length) {
+                    toast('No files found in the dropped item(s).', 'error');
+                    return;
+                }
+                await uploadDroppedToDrive(droppedItems, targetFolderId, targetLabel);
+            });
+        }
+
         $('#drive-inline-folder-btn')?.addEventListener('click', async () => {
             const input = $('#drive-inline-folder-name');
             const name = (input?.value || '').trim();
