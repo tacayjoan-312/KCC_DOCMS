@@ -119,6 +119,128 @@ function ensureDocumentFilesTable(PDO $pdo): void
     );
 }
 
+function ensureDocumentFileChunksTable(PDO $pdo): void
+{
+    static $checked = false;
+    if ($checked) {
+        return;
+    }
+    $checked = true;
+
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS `document_file_chunks` (
+            `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `stored_filename` VARCHAR(255) NOT NULL,
+            `chunk_index` INT UNSIGNED NOT NULL,
+            `chunk_data` MEDIUMBLOB NOT NULL,
+            `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uniq_file_chunk` (`stored_filename`, `chunk_index`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+}
+
+function saveFileToDbChunks(PDO $pdo, string $storedFilename, string $filePath): void
+{
+    $storedBase = basename($storedFilename);
+    if ($storedBase === '' || !is_file($filePath) || !is_readable($filePath)) {
+        return;
+    }
+
+    try {
+        ensureDocumentFileChunksTable($pdo);
+        $pdo->prepare('DELETE FROM `document_file_chunks` WHERE `stored_filename` = ?')->execute([$storedBase]);
+
+        $fh = @fopen($filePath, 'rb');
+        if ($fh === false) {
+            return;
+        }
+
+        try {
+            $insert = $pdo->prepare(
+                'INSERT INTO `document_file_chunks` (`stored_filename`, `chunk_index`, `chunk_data`) VALUES (?, ?, ?)'
+            );
+            $chunkIndex = 0;
+            while (!feof($fh)) {
+                $chunk = fread($fh, 524288); // 512 KB per row for TiDB/MySQL packet safety
+                if ($chunk === false || $chunk === '') {
+                    break;
+                }
+                $insert->bindValue(1, $storedBase, PDO::PARAM_STR);
+                $insert->bindValue(2, $chunkIndex, PDO::PARAM_INT);
+                $insert->bindValue(3, $chunk, PDO::PARAM_LOB);
+                $insert->execute();
+                $chunkIndex++;
+            }
+        } finally {
+            fclose($fh);
+        }
+    } catch (Throwable $e) {
+        // Keep local file upload working even if DB chunk backup fails
+    }
+}
+
+function restoreFileFromDbChunks(PDO $pdo, string $storedFilename, string $destPath): bool
+{
+    $storedBase = basename($storedFilename);
+    if ($storedBase === '') {
+        return false;
+    }
+
+    try {
+        ensureDocumentFileChunksTable($pdo);
+        $stmt = $pdo->prepare(
+            'SELECT `chunk_data` FROM `document_file_chunks` WHERE `stored_filename` = ? ORDER BY `chunk_index` ASC'
+        );
+        $stmt->execute([$storedBase]);
+
+        $rows = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        if (!$rows) {
+            return false;
+        }
+
+        ensureUploadDir();
+        $tmpPath = $destPath . '.tmp_' . bin2hex(random_bytes(4));
+        $fh = @fopen($tmpPath, 'wb');
+        if ($fh === false) {
+            return false;
+        }
+
+        $ok = true;
+        foreach ($rows as $chunk) {
+            if (!is_string($chunk) || fwrite($fh, $chunk) === false) {
+                $ok = false;
+                break;
+            }
+        }
+        fclose($fh);
+
+        if ($ok && @rename($tmpPath, $destPath)) {
+            return is_file($destPath) && is_readable($destPath);
+        }
+
+        @unlink($tmpPath);
+        return false;
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+function deleteFileDbChunks(PDO $pdo, string $storedFilename): void
+{
+    $storedBase = basename($storedFilename);
+    if ($storedBase === '') {
+        return;
+    }
+
+    try {
+        ensureDocumentFileChunksTable($pdo);
+        $pdo->prepare('DELETE FROM `document_file_chunks` WHERE `stored_filename` = ?')->execute([$storedBase]);
+    } catch (Throwable $e) {
+        // Ignore cleanup errors
+    }
+}
+
 function getBearerToken(bool $allowQueryToken = false): ?string
 {
     $authHeader = $_SERVER['HTTP_AUTHORIZATION']
@@ -716,7 +838,11 @@ function resolveAuthorizedDocumentFile(PDO $pdo, array $user, int $docId, int $f
         $targetFile = $fStmt->fetch() ?: $doc;
     }
 
-    $filePath = UPLOAD_DIR . DIRECTORY_SEPARATOR . basename((string) $targetFile['stored_filename']);
+    $storedBase = basename((string) $targetFile['stored_filename']);
+    $filePath = UPLOAD_DIR . DIRECTORY_SEPARATOR . $storedBase;
+    if (!is_file($filePath) || !is_readable($filePath)) {
+        restoreFileFromDbChunks($pdo, $storedBase, $filePath);
+    }
     if (!is_file($filePath) || !is_readable($filePath)) {
         return ['ok' => false, 'status' => 404, 'error' => 'Stored file is missing on server.'];
     }

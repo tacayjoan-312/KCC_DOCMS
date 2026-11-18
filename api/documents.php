@@ -473,6 +473,10 @@ if ($action === 'upload') {
 
         $pdo->commit();
 
+        foreach ($uploadedFiles as $uf) {
+            saveFileToDbChunks($pdo, (string) $uf['stored_filename'], (string) $uf['dest_path']);
+        }
+
         logActivity(
             (int) $user['id'],
             $docId,
@@ -756,6 +760,10 @@ if ($action === 'update') {
 
         $pdo->commit();
 
+        foreach ($uploadedFiles as $uf) {
+            saveFileToDbChunks($pdo, (string) $uf['stored_filename'], (string) $uf['dest_path']);
+        }
+
         $keptStoredSet = [];
         foreach ($finalFilesPreview as $ff) {
             $keptStoredSet[basename((string) $ff['stored_filename'])] = true;
@@ -767,6 +775,7 @@ if ($action === 'update') {
                 if (is_file($oldPath)) {
                     @unlink($oldPath);
                 }
+                deleteFileDbChunks($pdo, $rfBase);
             }
         }
 
@@ -924,6 +933,7 @@ if ($action === 'delete') {
         if (is_file($filePath)) {
             @unlink($filePath);
         }
+        deleteFileDbChunks($pdo, $storedBase);
     }
 
     logActivity(
