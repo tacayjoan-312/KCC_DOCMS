@@ -1072,22 +1072,28 @@ $csrfToken = getCsrfToken();
     <div id="upload-progress-modal" class="modal-overlay hidden" aria-modal="true" role="dialog">
         <div class="modal-card upload-progress-card neu-process-card">
             <div class="upload-anim-header">
-                <div class="neu-progress-ring" id="process-ring-wrap">
-                    <svg class="neu-progress-svg" viewBox="0 0 140 140" aria-hidden="true">
-                        <defs>
-                            <linearGradient id="neuProgressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#38bdf8"/>
-                                <stop offset="50%" stop-color="#0ea5e9"/>
-                                <stop offset="100%" stop-color="#2563eb"/>
-                            </linearGradient>
-                        </defs>
-                        <circle class="neu-progress-track-arc" cx="70" cy="70" r="56"/>
-                        <circle id="process-ring-arc" class="neu-progress-fill-arc" cx="70" cy="70" r="56"
-                                stroke-dasharray="351.86" stroke-dashoffset="351.86"/>
-                    </svg>
-                    <div class="neu-progress-inner">
-                        <span id="process-ring-pct" class="neu-progress-pct">0%</span>
-                        <span id="process-ring-label" class="neu-progress-label">LOADING...</span>
+                <div class="neu-progress-stage">
+                    <div class="neu-progress-ring" id="process-ring-wrap">
+                        <svg class="neu-progress-svg" viewBox="0 0 140 140" aria-hidden="true">
+                            <defs>
+                                <linearGradient id="neuProgressGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#818cf8"/>
+                                    <stop offset="50%" stop-color="#6366f1"/>
+                                    <stop offset="100%" stop-color="#7c3aed"/>
+                                </linearGradient>
+                            </defs>
+                            <circle class="neu-progress-track-arc" cx="70" cy="70" r="56"/>
+                            <circle id="process-ring-arc" class="neu-progress-fill-arc" cx="70" cy="70" r="56"
+                                    stroke-dasharray="351.86" stroke-dashoffset="351.86"/>
+                        </svg>
+                        <div class="neu-progress-inner">
+                            <span id="process-ring-pct" class="neu-progress-pct">0</span>
+                            <span id="process-ring-label" class="neu-progress-label">PERCENT</span>
+                        </div>
+                    </div>
+                    <div id="process-status-pill" class="neu-status-pill">
+                        <span class="neu-status-dot"></span>
+                        <span id="process-status-text">SENDING</span>
                     </div>
                 </div>
                 <h3 id="upload-progress-title">Uploading &amp; Dispatching...</h3>
@@ -1122,6 +1128,10 @@ $csrfToken = getCsrfToken();
                     <span class="step-text">Dispatching real-time Gmail notifications</span>
                 </li>
             </ul>
+
+            <div id="process-done-actions" class="hidden" style="margin-top:16px;text-align:center">
+                <button type="button" id="process-done-btn" class="btn btn-primary btn-sm">Done</button>
+            </div>
         </div>
     </div>
 

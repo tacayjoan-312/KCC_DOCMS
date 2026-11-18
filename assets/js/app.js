@@ -143,7 +143,10 @@
 
         $('#upload-progress-title').textContent = title;
         $('#upload-progress-sub').textContent = subtitle;
-        $('#process-ring-label').textContent = ringLabel;
+        $('#process-ring-label').textContent = 'PERCENT';
+        $('#process-status-text').textContent = ringLabel;
+        $('#process-status-pill')?.classList.remove('is-done');
+        $('#process-done-actions')?.classList.add('hidden');
 
         const ringWrap = $('#process-ring-wrap');
         if (ringWrap) {
@@ -176,10 +179,14 @@
             arc.style.strokeDashoffset = `${(NEU_RING_CIRCUMFERENCE * (1 - clamped / 100)).toFixed(2)}`;
         }
         const ringPct = $('#process-ring-pct');
-        if (ringPct) ringPct.textContent = `${Math.round(clamped)}%`;
-        if (ringLabel) {
-            const lbl = $('#process-ring-label');
-            if (lbl) lbl.textContent = ringLabel;
+        if (ringPct) ringPct.textContent = `${Math.round(clamped)}`;
+        const pillText = $('#process-status-text');
+        if (pillText && ringLabel) {
+            pillText.textContent = ringLabel;
+        }
+        const pill = $('#process-status-pill');
+        if (pill) {
+            pill.classList.toggle('is-done', clamped >= 100);
         }
 
         const fill = $('#upload-progress-fill');
@@ -2913,7 +2920,10 @@
                 await new Promise((r) => setTimeout(r, 250));
                 updateProcessModal(95, 'Dispatching real-time notifications...', 3, 'SENDING');
                 await new Promise((r) => setTimeout(r, 250));
-                updateProcessModal(100, 'Complete!', 4, 'DONE');
+                updateProcessModal(100, 'Successfully Sent!', 4, 'SENT');
+
+                $('#upload-progress-title').textContent = 'Document Sent Successfully!';
+                $('#upload-progress-sub').textContent = `${data.doc_code} delivered to ${data.recipient_count} recipient(s)`;
 
                 let msg = `${data.doc_code} (${data.file_count || 1} file(s)) sent to ${data.recipient_count} recipient(s)!`;
                 if (data.email_summary && data.email_summary.enabled) {
@@ -2921,14 +2931,26 @@
                 }
                 toast(msg, data.email_summary?.failed > 0 ? 'info' : 'success');
 
-                setTimeout(() => {
+                $('#upload-form').reset();
+                clearSelectedFiles();
+                $$('input[name="recipient_id"]').forEach((cb) => { cb.checked = false; });
+                updateSelectedRecipientCount();
+
+                const doneWrap = $('#process-done-actions');
+                const doneBtn = $('#process-done-btn');
+                const finishSend = () => {
                     hideProcessModal();
-                    $('#upload-form').reset();
-                    clearSelectedFiles();
-                    $$('input[name="recipient_id"]').forEach((cb) => { cb.checked = false; });
-                    updateSelectedRecipientCount();
+                    doneWrap?.classList.add('hidden');
                     switchView('sent');
-                }, 550);
+                };
+                doneWrap?.classList.remove('hidden');
+                const autoTimer = setTimeout(finishSend, 2200);
+                if (doneBtn) {
+                    doneBtn.onclick = () => {
+                        clearTimeout(autoTimer);
+                        finishSend();
+                    };
+                }
             } catch (err) {
                 hideProcessModal();
                 toast(err.message, 'error');
@@ -3460,18 +3482,31 @@
                         description: ($('#drive-send-desc')?.value || '').trim(),
                     },
                 });
-                updateProcessModal(100, 'Sent!', 3, 'DONE');
+                updateProcessModal(100, 'Successfully Sent!', 3, 'SENT');
+                $('#upload-progress-title').textContent = 'Document Sent Successfully!';
+                $('#upload-progress-sub').textContent = data.message || 'Document delivered to recipients';
                 let msg = data.message || 'Document sent!';
                 if (data.email_summary && data.email_summary.enabled) {
                     msg += ` Emails sent: ${data.email_summary.sent}, failed: ${data.email_summary.failed}.`;
                 }
                 toast(msg, 'success');
-                setTimeout(() => {
+                $('#drive-send-modal')?.classList.add('hidden');
+                loadDrive();
+                pollNotifications();
+                const doneWrap = $('#process-done-actions');
+                const doneBtn = $('#process-done-btn');
+                const finishDriveSend = () => {
                     hideProcessModal();
-                    $('#drive-send-modal')?.classList.add('hidden');
-                    loadDrive();
-                    pollNotifications();
-                }, 400);
+                    doneWrap?.classList.add('hidden');
+                };
+                doneWrap?.classList.remove('hidden');
+                const autoTimer = setTimeout(finishDriveSend, 2000);
+                if (doneBtn) {
+                    doneBtn.onclick = () => {
+                        clearTimeout(autoTimer);
+                        finishDriveSend();
+                    };
+                }
             } catch (err) {
                 hideProcessModal();
                 toast(err.message, 'error');

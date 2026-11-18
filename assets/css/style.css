@@ -2724,18 +2724,27 @@ body {
     box-shadow: 18px 18px 36px #b8c5d6, -18px -18px 36px #ffffff !important;
 }
 
+.neu-progress-stage {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0 auto 24px;
+}
+
 .neu-progress-ring {
     position: relative;
-    width: 140px;
-    height: 140px;
-    margin: 0 auto 16px;
+    width: 164px;
+    height: 164px;
+    margin: 0 auto;
     border-radius: 999px;
     background: #e8edf4;
+    border: 1px solid rgba(255, 255, 255, 0.85);
     box-shadow:
-        10px 10px 22px #c5d0e0,
-        -10px -10px 22px #ffffff,
-        inset 4px 4px 8px #c5d0e0,
-        inset -4px -4px 8px #ffffff;
+        12px 12px 26px #c5d0e0,
+        -12px -12px 26px #ffffff,
+        inset 3px 3px 6px rgba(197, 208, 224, 0.45),
+        inset -3px -3px 6px rgba(255, 255, 255, 0.7);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2758,13 +2767,13 @@ body {
 .neu-progress-track-arc {
     fill: none;
     stroke: rgba(197, 208, 224, 0.45);
-    stroke-width: 11;
+    stroke-width: 9;
 }
 
 .neu-progress-fill-arc {
     fill: none;
     stroke: url(#neuProgressGrad);
-    stroke-width: 11;
+    stroke-width: 9;
     stroke-linecap: round;
     transition: stroke-dashoffset 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -2781,12 +2790,12 @@ body {
 .neu-progress-inner {
     position: relative;
     z-index: 2;
-    width: 94px;
-    height: 94px;
+    width: 112px;
+    height: 112px;
     border-radius: 999px;
-    background: #e8edf4;
-    border: 1px solid rgba(255, 255, 255, 0.85);
-    box-shadow: 6px 6px 14px #c5d0e0, -6px -6px 14px #ffffff;
+    background: radial-gradient(circle at 35% 30%, #f8fafc 0%, #e8edf4 75%);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 7px 7px 16px #c5d0e0, -7px -7px 16px #ffffff;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -2800,10 +2809,11 @@ body {
 }
 
 .neu-progress-pct {
-    font-size: 20px;
-    font-weight: 800;
-    color: #1d4ed8;
-    line-height: 1.1;
+    font-size: 38px;
+    font-weight: 900;
+    color: #334155;
+    line-height: 1;
+    letter-spacing: -0.03em;
 }
 
 .neu-progress-ring.compact .neu-progress-pct {
@@ -2812,11 +2822,50 @@ body {
 
 .neu-progress-label {
     font-size: 9.5px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: #38bdf8;
+    font-weight: 800;
+    letter-spacing: 0.22em;
+    color: #6366f1;
     text-transform: uppercase;
-    margin-top: 2px;
+    margin-top: 5px;
+}
+
+.neu-status-pill {
+    position: relative;
+    z-index: 3;
+    margin-top: -16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    border-radius: 999px;
+    background: #e8edf4;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 5px 5px 12px #c5d0e0, -5px -5px 12px #ffffff;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    color: #334155;
+    text-transform: uppercase;
+}
+
+.neu-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.22);
+    animation: neuDotPulse 1.2s ease-in-out infinite;
+}
+
+.neu-status-pill.is-done .neu-status-dot {
+    background: #22c55e;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25), 0 0 8px rgba(34, 197, 94, 0.55);
+    animation: none;
+}
+
+@keyframes neuDotPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(0.75); opacity: 0.6; }
 }
 
 .upload-progress-track {
@@ -2826,7 +2875,7 @@ body {
 }
 
 .upload-progress-fill {
-    background: linear-gradient(90deg, #38bdf8 0%, #0ea5e9 45%, #2563eb 100%);
+    background: linear-gradient(90deg, #818cf8 0%, #6366f1 50%, #7c3aed 100%);
 }
 
 .step-badge {
