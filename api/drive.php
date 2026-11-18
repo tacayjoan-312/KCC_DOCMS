@@ -487,6 +487,7 @@ if ($method === 'POST') {
         $docxBytes = htmlToDocxBytes($html, $title, [
             'orientation' => (string) ($body['orientation'] ?? 'portrait'),
             'margins' => (string) ($body['margins'] ?? 'normal'),
+            'page_size' => (string) ($body['page_size'] ?? 'letter'),
         ]);
         $fileSize = strlen($docxBytes);
 

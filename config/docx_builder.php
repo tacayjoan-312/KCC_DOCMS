@@ -276,9 +276,15 @@ function htmlToDocxBytes(string $html, string $title = 'Document', array $layout
         $bodyXml = '<w:p><w:r><w:t></w:t></w:r></w:p>';
     }
 
+    $pageSizeKey = strtolower((string) ($layout['page_size'] ?? 'letter'));
+    [$baseW, $baseH] = match ($pageSizeKey) {
+        'legal' => [12240, 20160],
+        'a4' => [11906, 16838],
+        default => [12240, 15840], // Letter
+    };
     $orientation = ($layout['orientation'] ?? 'portrait') === 'landscape' ? 'landscape' : 'portrait';
-    $pgW = $orientation === 'landscape' ? 15840 : 12240;
-    $pgH = $orientation === 'landscape' ? 12240 : 15840;
+    $pgW = $orientation === 'landscape' ? $baseH : $baseW;
+    $pgH = $orientation === 'landscape' ? $baseW : $baseH;
     $orientAttr = $orientation === 'landscape' ? ' w:orient="landscape"' : '';
     $marginKey = $layout['margins'] ?? 'normal';
     $mar = match ($marginKey) {

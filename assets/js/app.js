@@ -3182,6 +3182,14 @@
             paper.classList.toggle('orient-landscape', e.target.value === 'landscape');
         });
 
+        $('#word-size-select')?.addEventListener('change', (e) => {
+            const paper = $('#gdoc-editor-paper');
+            if (!paper) return;
+            paper.classList.remove('size-legal', 'size-a4');
+            if (e.target.value === 'legal') paper.classList.add('size-legal');
+            if (e.target.value === 'a4') paper.classList.add('size-a4');
+        });
+
         $('#word-toggle-ruler')?.addEventListener('click', () => {
             $('.gdoc-ruler')?.classList.toggle('hidden');
         });
@@ -3249,6 +3257,7 @@
             const category = $('#gdoc-category-select')?.value || 'Memo';
             const margins = $('#word-margins-select')?.value || 'normal';
             const orientation = $('#word-orientation-select')?.value || 'portrait';
+            const pageSize = $('#word-size-select')?.value || 'letter';
 
             showProcessModal({
                 title: 'Saving Document to File Drive...',
@@ -3265,7 +3274,7 @@
             try {
                 const data = await apiFetch('api/drive.php?action=create_doc', {
                     method: 'POST',
-                    json: { title, html, folder_id: folderId, category, margins, orientation },
+                    json: { title, html, folder_id: folderId, category, margins, orientation, page_size: pageSize },
                 });
                 updateProcessModal(100, 'Saved to File Drive!', 3, 'DONE');
                 $('#gdoc-save-status').textContent = `Saved (${data.filename})`;

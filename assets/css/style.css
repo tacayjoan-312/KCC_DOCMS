@@ -3759,10 +3759,11 @@ body {
 }
 
 .gdoc-tool-select {
+    width: auto !important;
     border: 1px solid rgba(197, 208, 224, 0.6);
     background: #e8edf4;
     border-radius: 8px;
-    padding: 4px 8px;
+    padding: 4px 10px;
     font-size: 12.5px;
     color: var(--text);
     cursor: pointer;
@@ -3932,7 +3933,10 @@ body {
 .gdoc-paper td, .gdoc-paper th { border: 1px solid #cbd5e1; padding: 8px 10px; min-width: 60px; }
 .gdoc-paper.margin-narrow { padding: 28px 32px; }
 .gdoc-paper.margin-wide { padding: 72px 88px; }
+.gdoc-paper.size-legal { min-height: 1040px; }
+.gdoc-paper.size-a4 { max-width: 760px; min-height: 870px; }
 .gdoc-paper.orient-landscape { max-width: 1020px; min-height: 620px; }
+.gdoc-paper.orient-landscape.size-legal { max-width: 1240px; min-height: 620px; }
 
 /* Microsoft Word-style Ribbon */
 .word-ribbon {

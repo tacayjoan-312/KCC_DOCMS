@@ -1244,6 +1244,12 @@ $csrfToken = getCsrfToken();
                                 <option value="portrait" selected>Portrait</option>
                                 <option value="landscape">Landscape</option>
                             </select>
+                            <label class="muted" style="font-size:12px;margin-left:8px">Size:</label>
+                            <select id="word-size-select" class="gdoc-tool-select">
+                                <option value="letter" selected>Letter (8.5 &times; 11 in)</option>
+                                <option value="legal">Legal (8.5 &times; 14 in)</option>
+                                <option value="a4">A4 (8.27 &times; 11.69 in)</option>
+                            </select>
                         </div>
                         <div class="word-group-label">Page Setup</div>
                     </div>
