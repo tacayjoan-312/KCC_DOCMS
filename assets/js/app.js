@@ -4157,10 +4157,10 @@
                             toast(err.message, 'error');
                         }
                     } else if (act === 'delete') {
-                        if (!window.confirm(`Delete folder "${folderName}"? Files inside will be moved back to parent folder.`)) return;
+                        if (!window.confirm(`Delete folder "${folderName}" and all files/subfolders inside it? This cannot be undone.`)) return;
                         await runDeleteWithProgress({
                             title: `Deleting Folder "${folderName}"...`,
-                            subtitle: 'Moving items to parent folder and removing folder',
+                            subtitle: 'Removing folder and all files inside',
                             requestFn: () => apiFetch('api/drive.php?action=delete_folder', {
                                 method: 'POST',
                                 json: { folder_id: folderId },

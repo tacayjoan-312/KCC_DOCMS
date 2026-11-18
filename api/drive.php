@@ -387,7 +387,7 @@ if ($method === 'POST') {
             jsonError('Invalid folder ID.');
         }
         $isAdmin = ($user['role'] ?? '') === 'admin';
-        $fStmt = $pdo->prepare('SELECT owner_id, parent_id FROM document_folders WHERE id = ? LIMIT 1');
+        $fStmt = $pdo->prepare('SELECT owner_id, name FROM document_folders WHERE id = ? LIMIT 1');
         $fStmt->execute([$folderId]);
         $row = $fStmt->fetch();
         if (!$row) {
@@ -396,13 +396,75 @@ if ($method === 'POST') {
         if (!$isAdmin && (int) $row['owner_id'] !== (int) $user['id']) {
             jsonError('You do not have permission to delete this folder.', 403);
         }
-        $parentId = $row['parent_id'] !== null ? (int) $row['parent_id'] : null;
 
-        $pdo->prepare('UPDATE document_folders SET parent_id = ? WHERE parent_id = ?')->execute([$parentId, $folderId]);
-        $pdo->prepare('UPDATE documents SET folder_id = ? WHERE folder_id = ?')->execute([$parentId, $folderId]);
-        $pdo->prepare('DELETE FROM document_folders WHERE id = ?')->execute([$folderId]);
-        logActivity((int) $user['id'], null, 'drive_delete_folder', "Deleted folder #{$folderId}");
-        jsonResponse(['success' => true, 'message' => 'Folder deleted. Items moved to parent folder.']);
+        // Collect this folder and all nested subfolder IDs
+        $allFoldersStmt = $isAdmin
+            ? $pdo->query('SELECT id, parent_id FROM document_folders')
+            : $pdo->prepare('SELECT id, parent_id FROM document_folders WHERE owner_id = ?');
+        if (!$isAdmin) {
+            $allFoldersStmt->execute([(int) $user['id']]);
+        }
+        $childrenByParent = [];
+        foreach ($allFoldersStmt->fetchAll() as $fr) {
+            $pid = $fr['parent_id'] !== null ? (int) $fr['parent_id'] : 0;
+            $childrenByParent[$pid][] = (int) $fr['id'];
+        }
+
+        $folderIdsToDelete = [];
+        $queue = [$folderId];
+        while (!empty($queue)) {
+            $curr = array_shift($queue);
+            if (in_array($curr, $folderIdsToDelete, true)) {
+                continue;
+            }
+            $folderIdsToDelete[] = $curr;
+            foreach ($childrenByParent[$curr] ?? [] as $childId) {
+                $queue[] = $childId;
+            }
+        }
+
+        $fPlaceholders = implode(',', array_fill(0, count($folderIdsToDelete), '?'));
+
+        // Find all documents inside these folders and clean up their stored files + chunks
+        $docsStmt = $pdo->prepare("SELECT id, stored_filename FROM documents WHERE folder_id IN ($fPlaceholders)");
+        $docsStmt->execute($folderIdsToDelete);
+        $docRows = $docsStmt->fetchAll();
+
+        $storedNames = [];
+        $docIds = [];
+        foreach ($docRows as $dr) {
+            $docIds[] = (int) $dr['id'];
+            $base = basename((string) ($dr['stored_filename'] ?? ''));
+            if ($base !== '') {
+                $storedNames[$base] = true;
+            }
+        }
+
+        if (!empty($docIds)) {
+            $dPlaceholders = implode(',', array_fill(0, count($docIds), '?'));
+            $dfStmt = $pdo->prepare("SELECT stored_filename FROM document_files WHERE document_id IN ($dPlaceholders)");
+            $dfStmt->execute($docIds);
+            foreach ($dfStmt->fetchAll() as $df) {
+                $base = basename((string) ($df['stored_filename'] ?? ''));
+                if ($base !== '') {
+                    $storedNames[$base] = true;
+                }
+            }
+            $pdo->prepare("DELETE FROM documents WHERE id IN ($dPlaceholders)")->execute($docIds);
+        }
+
+        $pdo->prepare("DELETE FROM document_folders WHERE id IN ($fPlaceholders)")->execute($folderIdsToDelete);
+
+        foreach (array_keys($storedNames) as $storedBase) {
+            $filePath = UPLOAD_DIR . DIRECTORY_SEPARATOR . $storedBase;
+            if (is_file($filePath)) {
+                @unlink($filePath);
+            }
+            deleteFileDbChunks($pdo, $storedBase);
+        }
+
+        logActivity((int) $user['id'], null, 'drive_delete_folder', "Deleted folder \"{$row['name']}\" (#{$folderId}) and " . count($docIds) . " file(s)");
+        jsonResponse(['success' => true, 'message' => "Folder \"{$row['name']}\" and its contents were deleted."]);
     }
 
     if ($action === 'move_file') {
