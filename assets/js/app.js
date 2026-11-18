@@ -496,8 +496,7 @@
     }
 
     function canAccessDrive(user) {
-        // Currently restricted to Admin users; update this gate to enable for other roles in the future.
-        return user?.role === 'admin';
+        return Boolean(user);
     }
 
     // ---- Navigation ----

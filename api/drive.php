@@ -244,6 +244,10 @@ if ($method === 'POST') {
         if (!$doc) {
             jsonError('Document not found.', 404);
         }
+        $isAdmin = ($user['role'] ?? '') === 'admin';
+        if (!$isAdmin && (int) $doc['sender_id'] !== (int) $user['id']) {
+            jsonError('You do not have permission to send this file.', 403);
+        }
 
         $validRecipients = parseValidRecipients($pdo, $body['recipients'] ?? [], (int) $user['id']);
         $priority = trim((string) ($body['priority'] ?? ($doc['priority'] ?? 'normal')));
@@ -365,8 +369,14 @@ if ($method === 'POST') {
         if ($folderId <= 0 || $name === '' || mb_strlen($name) > 120) {
             jsonError('Valid folder ID and name are required.');
         }
-        $stmt = $pdo->prepare('UPDATE document_folders SET name = ? WHERE id = ?');
-        $stmt->execute([$name, $folderId]);
+        $isAdmin = ($user['role'] ?? '') === 'admin';
+        if ($isAdmin) {
+            $stmt = $pdo->prepare('UPDATE document_folders SET name = ? WHERE id = ?');
+            $stmt->execute([$name, $folderId]);
+        } else {
+            $stmt = $pdo->prepare('UPDATE document_folders SET name = ? WHERE id = ? AND owner_id = ?');
+            $stmt->execute([$name, $folderId, (int) $user['id']]);
+        }
         logActivity((int) $user['id'], null, 'drive_rename_folder', "Renamed folder #{$folderId} to \"{$name}\"");
         jsonResponse(['success' => true, 'message' => "Folder renamed to \"{$name}\"."]);
     }
@@ -376,10 +386,17 @@ if ($method === 'POST') {
         if ($folderId <= 0) {
             jsonError('Invalid folder ID.');
         }
-        $fStmt = $pdo->prepare('SELECT parent_id FROM document_folders WHERE id = ? LIMIT 1');
+        $isAdmin = ($user['role'] ?? '') === 'admin';
+        $fStmt = $pdo->prepare('SELECT owner_id, parent_id FROM document_folders WHERE id = ? LIMIT 1');
         $fStmt->execute([$folderId]);
         $row = $fStmt->fetch();
-        $parentId = $row && $row['parent_id'] !== null ? (int) $row['parent_id'] : null;
+        if (!$row) {
+            jsonError('Folder not found.', 404);
+        }
+        if (!$isAdmin && (int) $row['owner_id'] !== (int) $user['id']) {
+            jsonError('You do not have permission to delete this folder.', 403);
+        }
+        $parentId = $row['parent_id'] !== null ? (int) $row['parent_id'] : null;
 
         $pdo->prepare('UPDATE document_folders SET parent_id = ? WHERE parent_id = ?')->execute([$parentId, $folderId]);
         $pdo->prepare('UPDATE documents SET folder_id = ? WHERE folder_id = ?')->execute([$parentId, $folderId]);
@@ -394,10 +411,21 @@ if ($method === 'POST') {
         if ($docId <= 0) {
             jsonError('Invalid document ID.');
         }
+        $isAdmin = ($user['role'] ?? '') === 'admin';
+        if (!$isAdmin) {
+            $ownerCheck = $pdo->prepare('SELECT sender_id FROM documents WHERE id = ? LIMIT 1');
+            $ownerCheck->execute([$docId]);
+            $docRow = $ownerCheck->fetch();
+            if (!$docRow || (int) $docRow['sender_id'] !== (int) $user['id']) {
+                jsonError('You do not have permission to move this file.', 403);
+            }
+        }
         $targetFolder = $folderId > 0 ? $folderId : null;
         if ($targetFolder !== null) {
-            $exists = $pdo->prepare('SELECT id FROM document_folders WHERE id = ? LIMIT 1');
-            $exists->execute([$targetFolder]);
+            $exists = $isAdmin
+                ? $pdo->prepare('SELECT id FROM document_folders WHERE id = ? LIMIT 1')
+                : $pdo->prepare('SELECT id FROM document_folders WHERE id = ? AND owner_id = ? LIMIT 1');
+            $exists->execute($isAdmin ? [$targetFolder] : [$targetFolder, (int) $user['id']]);
             if (!$exists->fetch()) {
                 jsonError('Target folder not found.', 404);
             }
