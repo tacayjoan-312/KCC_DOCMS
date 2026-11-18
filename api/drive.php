@@ -314,8 +314,7 @@ if ($method === 'POST') {
                     'description' => $note !== '' ? $note : (string) $doc['description'],
                 ];
                 foreach ($newlySentRecipients as $rec) {
-                    $res = sendDocumentNotificationEmail($rec, $user, $docPayload);
-                    if (!empty($res['success'])) {
+                    if (sendDocumentEmailNotification($rec, $user, $docPayload, $emailConfig)) {
                         $emailSummary['sent']++;
                     } else {
                         $emailSummary['failed']++;
