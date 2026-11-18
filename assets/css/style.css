@@ -2663,7 +2663,10 @@ body {
     -webkit-backdrop-filter: blur(6px);
 }
 
-.modal-card {
+.modal-card,
+.modal-dialog {
+    position: relative;
+    z-index: 2;
     background: #e8edf4;
     border: 1px solid rgba(255, 255, 255, 0.85);
     border-radius: 24px;

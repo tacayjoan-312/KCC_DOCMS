@@ -982,7 +982,7 @@ $csrfToken = getCsrfToken();
     <!-- Modal: Upload to File Drive -->
     <div id="drive-upload-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="drive-upload-modal-title">
         <div class="modal-backdrop" data-close-modal="drive-upload-modal"></div>
-        <div class="modal-card modal-md">
+        <div class="modal-dialog modal-sm" style="max-width:540px">
             <div class="modal-header">
                 <h3 id="drive-upload-modal-title">Upload File to Drive</h3>
                 <button type="button" class="icon-btn" data-close-modal="drive-upload-modal">&times;</button>
@@ -1029,7 +1029,7 @@ $csrfToken = getCsrfToken();
     <!-- Modal: Send File from File Drive -->
     <div id="drive-send-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="drive-send-modal-title">
         <div class="modal-backdrop" data-close-modal="drive-send-modal"></div>
-        <div class="modal-card modal-md">
+        <div class="modal-dialog modal-sm" style="max-width:540px">
             <div class="modal-header">
                 <div>
                     <span id="drive-send-doc-code" class="doc-code">DOC</span>
