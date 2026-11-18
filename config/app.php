@@ -59,6 +59,20 @@ function handleApiCors(): void
 
 handleApiCors();
 
+if (PHP_SAPI !== 'cli' && strpos(str_replace('\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? '')), '/api/') !== false) {
+    set_exception_handler(static function (Throwable $e): void {
+        if (!headers_sent()) {
+            http_response_code(500);
+            header('Content-Type: application/json; charset=utf-8');
+        }
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage() ?: 'Unexpected server error.',
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    });
+}
+
 function ensureApiTokensTable(PDO $pdo): void
 {
     static $checked = false;
@@ -992,7 +1006,15 @@ function generateDocumentCode(PDO $pdo): string
     $year = date('Y');
     $stmt = $pdo->query('SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM documents');
     $nextId = (int) ($stmt->fetchColumn() ?: 1);
-    return sprintf('DOC-%s-%04d', $year, $nextId);
+    $check = $pdo->prepare('SELECT 1 FROM documents WHERE doc_code = ? LIMIT 1');
+    for ($i = 0; $i < 25; $i++) {
+        $code = sprintf('DOC-%s-%04d', $year, $nextId + $i);
+        $check->execute([$code]);
+        if (!$check->fetchColumn()) {
+            return $code;
+        }
+    }
+    return sprintf('DOC-%s-%s', $year, strtoupper(bin2hex(random_bytes(3))));
 }
 
 function resolveAuthorizedDocumentFile(PDO $pdo, array $user, int $docId, int $fileId = 0): array

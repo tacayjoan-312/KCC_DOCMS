@@ -116,7 +116,7 @@
         try {
             data = await res.json();
         } catch {
-            data = { success: false, error: 'Invalid server response.' };
+            data = { success: false, error: `Invalid server response (HTTP ${res.status}).` };
         }
 
         if (!res.ok || data.success === false) {
@@ -267,7 +267,7 @@
                 try {
                     data = JSON.parse(xhr.responseText || '{}');
                 } catch {
-                    data = { success: false, error: 'Invalid server response.' };
+                    data = { success: false, error: `Invalid server response (HTTP ${xhr.status}).` };
                 }
                 if (xhr.status < 200 || xhr.status >= 300 || data.success === false) {
                     if (xhr.status === 401 && state.user) showAuthScreen();
