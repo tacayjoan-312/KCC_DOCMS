@@ -464,61 +464,59 @@ $csrfToken = getCsrfToken();
                     </div>
                 </section>
 
-                <!-- VIEW: Admin File Drive (Future-ready for all users) -->
+                <!-- VIEW: Admin File Drive (Google Drive-style, future-ready for all users) -->
                 <section id="view-admin-drive" class="view-section hidden">
-                    <div id="drive-storage-card" class="card drive-storage-card">
-                        <div class="drive-storage-head">
-                            <h3>Storage Overview</h3>
-                            <span id="drive-storage-summary" class="drive-storage-summary">Loading...</span>
-                        </div>
-                        <div id="drive-storage-bar" class="drive-storage-bar"></div>
-                        <div id="drive-storage-legend" class="drive-storage-legend"></div>
-                    </div>
-
-                    <div class="drive-section">
-                        <div class="drive-section-head">
-                            <div class="drive-title-group">
-                                <h3>Folders</h3>
-                                <div id="drive-folder-breadcrumb" class="drive-breadcrumb hidden">
-                                    <button type="button" id="drive-back-root-btn" class="link-btn">All Folders</button>
-                                    <span>/</span>
-                                    <strong id="drive-active-folder-name"></strong>
+                    <div class="gd-shell card">
+                        <!-- Top Toolbar -->
+                        <div class="gd-toolbar">
+                            <div class="gd-toolbar-left">
+                                <span class="gd-title">Files</span>
+                                <div class="gd-search-wrap">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                    <input type="text" id="drive-search-input" placeholder="Search files and folders">
                                 </div>
+                                <select id="drive-type-filter" class="gd-filter-select" title="Filter by type">
+                                    <option value="all">Filter: All</option>
+                                    <option value="folders">Folders Only</option>
+                                    <option value="docs">Documents (.doc/.docx/.txt)</option>
+                                    <option value="pdf">PDF Files</option>
+                                    <option value="sheets">Sheets &amp; Slides</option>
+                                    <option value="images">Images</option>
+                                </select>
                             </div>
-                            <div class="drive-head-actions">
-                                <button type="button" id="drive-new-folder-btn" class="btn btn-outline btn-sm">+ New Folder</button>
-                                <button type="button" id="drive-upload-btn" class="btn btn-primary btn-sm">Upload File</button>
-                            </div>
-                        </div>
-                        <div id="drive-folders-grid" class="drive-folders-grid"></div>
-                    </div>
-
-                    <div class="drive-section">
-                        <div class="drive-section-head">
-                            <h3>Recently Opened Files</h3>
-                            <div class="drive-head-actions">
-                                <div class="drive-view-toggle" data-target="recent">
+                            <div class="gd-toolbar-right">
+                                <div class="drive-view-toggle" id="drive-layout-toggle">
                                     <button type="button" class="drive-toggle-btn" data-mode="list" title="List view">&#9776;</button>
                                     <button type="button" class="drive-toggle-btn active" data-mode="grid" title="Grid view">&#9638;</button>
                                 </div>
-                                <input type="text" id="drive-recent-search" class="drive-search-input" placeholder="Search files...">
                             </div>
                         </div>
-                        <div id="drive-recent-wrap" class="drive-cards-grid"></div>
-                    </div>
 
-                    <div class="drive-section">
-                        <div class="drive-section-head">
-                            <h3>All Files</h3>
-                            <div class="drive-head-actions">
-                                <div class="drive-view-toggle" data-target="all">
-                                    <button type="button" class="drive-toggle-btn active" data-mode="list" title="List view">&#9776;</button>
-                                    <button type="button" class="drive-toggle-btn" data-mode="grid" title="Grid view">&#9638;</button>
+                        <!-- Two-Pane Body: Left Tree + Right Content -->
+                        <div class="gd-body">
+                            <aside class="gd-sidebar">
+                                <div class="gd-add-wrap">
+                                    <button type="button" id="drive-add-new-btn" class="gd-add-btn">
+                                        <span>+ Add New</span>
+                                    </button>
+                                    <div id="drive-add-menu" class="gd-add-menu hidden">
+                                        <button type="button" id="drive-menu-new-folder">New Folder</button>
+                                        <button type="button" id="drive-menu-upload-files">Upload Files</button>
+                                        <button type="button" id="drive-menu-upload-folder">Upload Folder</button>
+                                    </div>
+                                    <input type="file" id="drive-folder-picker" webkitdirectory multiple class="hidden">
                                 </div>
-                                <input type="text" id="drive-all-search" class="drive-search-input" placeholder="Search files...">
+                                <div id="drive-folder-tree" class="gd-tree"></div>
+                            </aside>
+
+                            <div class="gd-main">
+                                <div class="gd-breadcrumb-bar">
+                                    <button type="button" id="drive-refresh-btn" class="drive-menu-btn" title="Refresh">&#8635;</button>
+                                    <div id="drive-breadcrumb" class="gd-breadcrumb"></div>
+                                </div>
+                                <div id="drive-canvas" class="gd-canvas"></div>
                             </div>
                         </div>
-                        <div id="drive-all-wrap"></div>
                     </div>
                 </section>
 

@@ -698,14 +698,26 @@ function ensureDriveSchema(PDO $pdo): void
         'CREATE TABLE IF NOT EXISTS `document_folders` (
             `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
             `name` VARCHAR(120) NOT NULL,
+            `parent_id` INT UNSIGNED NULL DEFAULT NULL,
             `owner_id` INT UNSIGNED NOT NULL,
             `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
             KEY `idx_doc_folders_owner` (`owner_id`),
+            KEY `idx_doc_folders_parent` (`parent_id`),
             CONSTRAINT `fk_doc_folders_owner` FOREIGN KEY (`owner_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
     );
+
+    $parentCol = $pdo->query("SHOW COLUMNS FROM `document_folders` LIKE 'parent_id'")->fetch();
+    if (!$parentCol) {
+        $pdo->exec('ALTER TABLE `document_folders` ADD COLUMN `parent_id` INT UNSIGNED NULL DEFAULT NULL AFTER `name`');
+        try {
+            $pdo->exec('ALTER TABLE `document_folders` ADD KEY `idx_doc_folders_parent` (`parent_id`)');
+        } catch (Throwable $e) {
+            // Index may already exist
+        }
+    }
 
     $col = $pdo->query("SHOW COLUMNS FROM `documents` LIKE 'folder_id'")->fetch();
     if (!$col) {

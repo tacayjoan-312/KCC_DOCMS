@@ -38,19 +38,19 @@ if ($method === 'GET' && $action === 'overview') {
     $totalBytes = (int) ($stRow['total_bytes'] ?? 0);
     $quotaBytes = $totalBytes > 1073741824 ? 10737418240 : 1073741824; // 1 GB default, scales to 10 GB if exceeded
 
-    // Folders list
+    // Folders list (with parent_id for nested Google Drive-style tree)
     $folderWhere = $isAdmin ? '1=1' : 'f.owner_id = ?';
     $folderParams = $isAdmin ? [] : [(int) $user['id']];
     $fStmt = $pdo->prepare(
-        'SELECT f.id, f.name, f.owner_id, f.created_at, f.updated_at,
+        'SELECT f.id, f.name, f.parent_id, f.owner_id, f.created_at, f.updated_at,
                 u.full_name AS owner_name,
                 COUNT(d.id) AS file_count
          FROM document_folders f
          INNER JOIN users u ON u.id = f.owner_id
          LEFT JOIN documents d ON d.folder_id = f.id
          WHERE ' . $folderWhere . '
-         GROUP BY f.id, f.name, f.owner_id, f.created_at, f.updated_at, u.full_name
-         ORDER BY f.updated_at DESC, f.name ASC'
+         GROUP BY f.id, f.name, f.parent_id, f.owner_id, f.created_at, f.updated_at, u.full_name
+         ORDER BY f.name ASC'
     );
     $fStmt->execute($folderParams);
     $folders = $fStmt->fetchAll();
@@ -73,17 +73,18 @@ if ($method === 'GET' && $action === 'overview') {
     $rStmt->execute($scopeParams);
     $recentFiles = $rStmt->fetchAll();
 
-    // All files (optionally filtered by folder_id and search)
+    // Files in current folder (or global search across all folders when search is non-empty)
     $filesWhere = [$scopeWhere];
     $filesParams = $scopeParams;
-    if ($folderId > 0) {
-        $filesWhere[] = 'd.folder_id = ?';
-        $filesParams[] = $folderId;
-    }
     if ($search !== '') {
         $filesWhere[] = '(d.title LIKE ? OR d.doc_code LIKE ? OR d.original_filename LIKE ? OR s.full_name LIKE ?)';
         $like = '%' . $search . '%';
         array_push($filesParams, $like, $like, $like, $like);
+    } elseif ($folderId > 0) {
+        $filesWhere[] = 'd.folder_id = ?';
+        $filesParams[] = $folderId;
+    } else {
+        $filesWhere[] = 'd.folder_id IS NULL';
     }
 
     $allStmt = $pdo->prepare(
@@ -342,11 +343,20 @@ if ($method === 'POST') {
         if ($name === '' || mb_strlen($name) > 120) {
             jsonError('Folder name must be between 1 and 120 characters.');
         }
-        $stmt = $pdo->prepare('INSERT INTO document_folders (name, owner_id) VALUES (?, ?)');
-        $stmt->execute([$name, (int) $user['id']]);
+        $parentId = (int) ($body['parent_id'] ?? 0);
+        $targetParent = $parentId > 0 ? $parentId : null;
+        if ($targetParent !== null) {
+            $pCheck = $pdo->prepare('SELECT id FROM document_folders WHERE id = ? LIMIT 1');
+            $pCheck->execute([$targetParent]);
+            if (!$pCheck->fetch()) {
+                jsonError('Parent folder not found.', 404);
+            }
+        }
+        $stmt = $pdo->prepare('INSERT INTO document_folders (name, parent_id, owner_id) VALUES (?, ?, ?)');
+        $stmt->execute([$name, $targetParent, (int) $user['id']]);
         $id = (int) $pdo->lastInsertId();
         logActivity((int) $user['id'], null, 'drive_create_folder', "Created folder \"{$name}\"");
-        jsonResponse(['success' => true, 'folder_id' => $id, 'message' => "Folder \"{$name}\" created."]);
+        jsonResponse(['success' => true, 'folder_id' => $id, 'parent_id' => $targetParent, 'message' => "Folder \"{$name}\" created."]);
     }
 
     if ($action === 'rename_folder') {
@@ -366,10 +376,16 @@ if ($method === 'POST') {
         if ($folderId <= 0) {
             jsonError('Invalid folder ID.');
         }
-        $pdo->prepare('UPDATE documents SET folder_id = NULL WHERE folder_id = ?')->execute([$folderId]);
+        $fStmt = $pdo->prepare('SELECT parent_id FROM document_folders WHERE id = ? LIMIT 1');
+        $fStmt->execute([$folderId]);
+        $row = $fStmt->fetch();
+        $parentId = $row && $row['parent_id'] !== null ? (int) $row['parent_id'] : null;
+
+        $pdo->prepare('UPDATE document_folders SET parent_id = ? WHERE parent_id = ?')->execute([$parentId, $folderId]);
+        $pdo->prepare('UPDATE documents SET folder_id = ? WHERE folder_id = ?')->execute([$parentId, $folderId]);
         $pdo->prepare('DELETE FROM document_folders WHERE id = ?')->execute([$folderId]);
         logActivity((int) $user['id'], null, 'drive_delete_folder', "Deleted folder #{$folderId}");
-        jsonResponse(['success' => true, 'message' => 'Folder deleted. Files moved back to root.']);
+        jsonResponse(['success' => true, 'message' => 'Folder deleted. Items moved to parent folder.']);
     }
 
     if ($action === 'move_file') {
