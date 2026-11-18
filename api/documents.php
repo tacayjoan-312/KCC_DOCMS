@@ -91,7 +91,8 @@ if ($method === 'GET') {
                 LEFT JOIN document_recipients dr ON dr.document_id = d.id
                 LEFT JOIN users u ON u.id = dr.recipient_id
                 WHERE ' . implode(' AND ', $where) . '
-                GROUP BY d.id
+                GROUP BY d.id, d.doc_code, d.title, d.category, d.description, d.original_filename,
+                         d.file_size, d.mime_type, d.file_ext, d.priority, d.status, d.created_at
                 ORDER BY d.created_at DESC';
 
         $stmt = $pdo->prepare($sql);
@@ -149,7 +150,9 @@ if ($method === 'GET') {
                 LEFT JOIN document_recipients dr ON dr.document_id = d.id
                 LEFT JOIN users u ON u.id = dr.recipient_id
                 WHERE ' . implode(' AND ', $where) . '
-                GROUP BY d.id
+                GROUP BY d.id, d.doc_code, d.title, d.category, d.description, d.original_filename,
+                         d.file_size, d.mime_type, d.file_ext, d.priority, d.status, d.created_at,
+                         s.id, s.full_name, s.username, s.department
                 ORDER BY d.created_at DESC';
 
         $stmt = $pdo->prepare($sql);
