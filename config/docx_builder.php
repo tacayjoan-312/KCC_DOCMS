@@ -231,6 +231,11 @@ function htmlToDocxBytes(string $html, string $title = 'Document', array $layout
             }
 
             $tag = strtolower($child->nodeName);
+            if ($tag === 'div' && $child instanceof DOMElement && str_contains($child->getAttribute('class'), 'word-page-break')) {
+                $flushInline();
+                $bodyXml .= '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+                continue;
+            }
             if (in_array($tag, ['h1', 'h2', 'h3', 'p', 'div', 'blockquote'], true)) {
                 $flushInline();
                 $runs = [];

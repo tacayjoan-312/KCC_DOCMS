@@ -3142,12 +3142,145 @@
         });
 
         $('#word-insert-table')?.addEventListener('click', () => {
+            const spec = window.prompt('Table size (rows x cols, e.g. 3x3):', '3x3');
+            if (!spec) return;
+            const parts = spec.toLowerCase().split('x').map((n) => Math.max(1, Math.min(10, parseInt(n, 10) || 3)));
+            const rows = parts[0] || 3;
+            const cols = parts[1] || 3;
+            const headerCells = Array.from({ length: cols }, (_, c) => `<th>Header ${c + 1}</th>`).join('');
+            const bodyRows = Array.from({ length: Math.max(1, rows - 1) }, () =>
+                `<tr>${Array.from({ length: cols }, () => '<td>Cell</td>').join('')}</tr>`
+            ).join('');
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand('insertHTML', false, `<table><thead><tr>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table><p><br></p>`);
+        });
+
+        $('#word-insert-cover')?.addEventListener('click', () => {
+            const title = escapeHtml($('#gdoc-title-input')?.value || 'Document Title');
+            const author = escapeHtml(state.user?.full_name || 'Author');
+            const today = escapeHtml(new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }));
             $('#gdoc-editor-paper')?.focus();
             document.execCommand(
                 'insertHTML',
                 false,
-                '<table><thead><tr><th>Column 1</th><th>Column 2</th><th>Column 3</th></tr></thead><tbody><tr><td>Cell</td><td>Cell</td><td>Cell</td></tr><tr><td>Cell</td><td>Cell</td><td>Cell</td></tr></tbody></table><p><br></p>'
+                `<div style="text-align:center;padding:60px 20px"><h1>${title}</h1><p>Prepared by: <strong>${author}</strong></p><p>${today}</p></div><div class="word-page-break">Page Break</div><p><br></p>`
             );
+            syncGdocOutline();
+        });
+
+        $('#word-insert-blank-page')?.addEventListener('click', () => {
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand('insertHTML', false, '<div class="word-page-break">Page Break</div><p><br></p><div class="word-page-break">Page Break</div><p><br></p>');
+        });
+
+        $('#word-insert-page-break')?.addEventListener('click', () => {
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand('insertHTML', false, '<div class="word-page-break">Page Break</div><p><br></p>');
+        });
+
+        $('#word-insert-picture')?.addEventListener('click', () => {
+            const inp = $('#word-picture-input');
+            if (inp) {
+                inp.value = '';
+                inp.click();
+            }
+        });
+
+        $('#word-picture-input')?.addEventListener('change', (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = () => {
+                $('#gdoc-editor-paper')?.focus();
+                document.execCommand('insertHTML', false, `<p><img src="${reader.result}" alt="${escapeHtml(file.name)}"></p>`);
+            };
+            reader.readAsDataURL(file);
+        });
+
+        $('#word-insert-shape')?.addEventListener('click', () => {
+            const choice = window.prompt('Choose shape (1: Box, 2: Callout, 3: Banner):', '1');
+            if (!choice) return;
+            $('#gdoc-editor-paper')?.focus();
+            if (choice.trim() === '2') {
+                document.execCommand('insertHTML', false, '<div class="word-comment-box"><strong>Callout:</strong> Enter note text here...</div><p><br></p>');
+            } else if (choice.trim() === '3') {
+                document.execCommand('insertHTML', false, '<div style="background:#dbeafe;border-radius:10px;padding:12px 16px;text-align:center;font-weight:700;color:#1e40af;margin:10px 0">Section Banner</div><p><br></p>');
+            } else {
+                document.execCommand('insertHTML', false, '<div class="word-textbox">Shape / Text Box content...</div><p><br></p>');
+            }
+        });
+
+        $('#word-insert-icon')?.addEventListener('click', () => {
+            const icon = window.prompt('Pick an icon to insert:\n✓  ★  ⚠  📄  📁  ✉  📞  📅  ➜', '✓');
+            if (!icon) return;
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand('insertText', false, `${icon} `);
+        });
+
+        $('#word-insert-bookmark')?.addEventListener('click', () => {
+            const name = window.prompt('Bookmark name:', 'Section1');
+            if (!name || !name.trim()) return;
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand('insertHTML', false, `<a id="${escapeHtml(name.trim())}" style="color:#2563eb;font-weight:600">[&#128278; ${escapeHtml(name.trim())}]</a> `);
+        });
+
+        $('#word-insert-comment')?.addEventListener('click', () => {
+            const text = window.prompt('Enter comment / review note:', 'Review note...');
+            if (!text || !text.trim()) return;
+            const author = escapeHtml(state.user?.full_name || 'Reviewer');
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand('insertHTML', false, `<div class="word-comment-box"><strong>${author}:</strong> ${escapeHtml(text.trim())}</div><p><br></p>`);
+        });
+
+        $('#word-insert-header')?.addEventListener('click', () => {
+            const text = window.prompt('Header text:', $('#gdoc-title-input')?.value || 'KCC Document');
+            if (text === null) return;
+            const paper = $('#gdoc-editor-paper');
+            if (!paper) return;
+            const existing = paper.querySelector('.word-header-block');
+            if (existing) existing.remove();
+            paper.insertAdjacentHTML('afterbegin', `<div class="word-header-block">${escapeHtml(text)}</div>`);
+        });
+
+        $('#word-insert-footer')?.addEventListener('click', () => {
+            const text = window.prompt('Footer text:', 'Confidential - KCC DOCMS');
+            if (text === null) return;
+            const paper = $('#gdoc-editor-paper');
+            if (!paper) return;
+            const existing = paper.querySelector('.word-footer-block');
+            if (existing) existing.remove();
+            paper.insertAdjacentHTML('beforeend', `<div class="word-footer-block"><span>${escapeHtml(text)}</span><span>Page 1</span></div>`);
+        });
+
+        $('#word-insert-pagenum')?.addEventListener('click', () => {
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand('insertText', false, 'Page 1 ');
+        });
+
+        $('#word-insert-textbox')?.addEventListener('click', () => {
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand('insertHTML', false, '<div class="word-textbox">Type text box content here...</div><p><br></p>');
+        });
+
+        $('#word-insert-wordart')?.addEventListener('click', () => {
+            const text = window.prompt('WordArt text:', 'DOCUMENT TITLE');
+            if (!text || !text.trim()) return;
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand('insertHTML', false, `<div class="word-art-text">${escapeHtml(text.trim())}</div><p><br></p>`);
+        });
+
+        $('#word-insert-equation')?.addEventListener('click', () => {
+            const eq = window.prompt('Insert equation:', 'E = mc²   |   a² + b² = c²   |   ∑(xᵢ) / n');
+            if (!eq) return;
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand('insertHTML', false, `<p style="font-family:'Times New Roman',serif;font-style:italic;background:#f8fafc;padding:6px 12px;border-radius:6px;display:inline-block">${escapeHtml(eq)}</p><p><br></p>`);
+        });
+
+        $('#word-insert-symbol')?.addEventListener('click', () => {
+            const sym = window.prompt('Pick a symbol to insert:\n©  ®  ™  °  ±  ×  ÷  ≤  ≥  ≠  →  •  §  π  Ω', '©');
+            if (!sym) return;
+            $('#gdoc-editor-paper')?.focus();
+            document.execCommand('insertText', false, sym);
         });
 
         $('#word-insert-link')?.addEventListener('click', () => {

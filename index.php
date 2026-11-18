@@ -1219,13 +1219,65 @@ $csrfToken = getCsrfToken();
                 <div class="word-ribbon-panel hidden" data-ribbon-panel="insert">
                     <div class="word-group">
                         <div class="word-group-body">
-                            <button type="button" class="gdoc-tool-btn" id="word-insert-table">&#8862; Table (3&times;3)</button>
-                            <button type="button" class="gdoc-tool-btn" data-cmd="insertHorizontalRule">&#8212; Horizontal Line</button>
-                            <button type="button" class="gdoc-tool-btn" id="word-insert-link">&#128279; Link</button>
-                            <button type="button" class="gdoc-tool-btn" id="word-insert-date">&#128197; Today's Date</button>
-                            <button type="button" class="gdoc-tool-btn" id="word-insert-sig">&#9998; Signature Block</button>
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-cover" title="Insert Cover Page">Cover Page</button>
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-blank-page" title="Insert Blank Page">Blank Page</button>
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-page-break" title="Insert Page Break">Page Break</button>
                         </div>
-                        <div class="word-group-label">Insert Elements</div>
+                        <div class="word-group-label">Pages</div>
+                    </div>
+
+                    <div class="word-group">
+                        <div class="word-group-body">
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-table" title="Insert Table">&#8862; Table</button>
+                        </div>
+                        <div class="word-group-label">Tables</div>
+                    </div>
+
+                    <div class="word-group">
+                        <div class="word-group-body">
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-picture" title="Insert Picture">&#128444; Pictures</button>
+                            <input type="file" id="word-picture-input" accept="image/*" class="hidden">
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-shape" title="Insert Shape">&#9635; Shapes</button>
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-icon" title="Insert Icon">&#9733; Icons</button>
+                        </div>
+                        <div class="word-group-label">Illustrations</div>
+                    </div>
+
+                    <div class="word-group">
+                        <div class="word-group-body">
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-link" title="Insert Link">&#128279; Link</button>
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-bookmark" title="Insert Bookmark">&#128278; Bookmark</button>
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-comment" title="Insert Comment">&#128172; Comment</button>
+                        </div>
+                        <div class="word-group-label">Links &amp; Comments</div>
+                    </div>
+
+                    <div class="word-group">
+                        <div class="word-group-body">
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-header" title="Insert Header">Header</button>
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-footer" title="Insert Footer">Footer</button>
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-pagenum" title="Insert Page Number"># Page No.</button>
+                        </div>
+                        <div class="word-group-label">Header &amp; Footer</div>
+                    </div>
+
+                    <div class="word-group">
+                        <div class="word-group-body">
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-textbox" title="Insert Text Box">Text Box</button>
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-wordart" title="Insert WordArt">WordArt</button>
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-sig" title="Insert Signature Line">&#9998; Signature</button>
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-date" title="Insert Date &amp; Time">&#128197; Date &amp; Time</button>
+                            <button type="button" class="gdoc-tool-btn" data-cmd="insertHorizontalRule" title="Insert Horizontal Line">&#8212; Line</button>
+                        </div>
+                        <div class="word-group-label">Text</div>
+                    </div>
+
+                    <div class="word-group">
+                        <div class="word-group-body">
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-equation" title="Insert Equation">&pi; Equation</button>
+                            <button type="button" class="gdoc-tool-btn" id="word-insert-symbol" title="Insert Symbol">&Omega; Symbol</button>
+                        </div>
+                        <div class="word-group-label">Symbols</div>
                     </div>
                 </div>
 
